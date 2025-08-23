@@ -67,6 +67,8 @@ export default function ReceiptList({ receipts }: ReceiptListProps) {
               <TableRow>
                 <TableHead>Company</TableHead>
                 <TableHead className="hidden sm:table-cell">Date</TableHead>
+                <TableHead className="text-right hidden md:table-cell">GST</TableHead>
+                <TableHead className="text-right hidden md:table-cell">PST</TableHead>
                 <TableHead className="text-right">Total</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -76,6 +78,8 @@ export default function ReceiptList({ receipts }: ReceiptListProps) {
                 <TableRow key={receipt.id}>
                   <TableCell className="font-medium">{receipt.companyName}</TableCell>
                   <TableCell className="hidden sm:table-cell text-muted-foreground">{formatDate(receipt.date)}</TableCell>
+                  <TableCell className="text-right font-mono hidden md:table-cell">{receipt.gst ? formatCurrency(receipt.gst) : 'N/A'}</TableCell>
+                  <TableCell className="text-right font-mono hidden md:table-cell">{receipt.pst ? formatCurrency(receipt.pst) : 'N/A'}</TableCell>
                   <TableCell className="text-right font-mono">{formatCurrency(receipt.totalAmount)}</TableCell>
                   <TableCell className="text-right">
                     <Dialog>
