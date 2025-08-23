@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { Eye, ReceiptText } from 'lucide-react';
+import { Eye, ReceiptText, FileDown } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -27,6 +27,51 @@ type ReceiptListProps = {
 };
 
 export default function ReceiptList({ receipts }: ReceiptListProps) {
+  const formatCurrency = (amount: string | null) => {
+    if (amount === null) return 'N/A';
+    const number = parseFloat(amount.replace(/[^0-9.-]+/g, ""));
+    return isNaN(number) ? amount : `$${number.toFixed(2)}`;
+  };
+  
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+  };
+
+  const handleExportCSV = () => {
+    const headers = ['Date', 'Company', 'Description', 'Total Amount', 'GST', 'PST', 'Image URL'];
+    const csvRows = [headers.join(',')];
+
+    receipts.forEach(receipt => {
+      const row = [
+        `"${formatDate(receipt.date)}"`,
+        `"${receipt.companyName.replace(/"/g, '""')}"`,
+        `"${receipt.description.replace(/"/g, '""')}"`,
+        `"${receipt.totalAmount}"`,
+        `"${receipt.gst || 'N/A'}"`,
+        `"${receipt.pst || 'N/A'}"`,
+        `"${receipt.image}"`,
+      ];
+      csvRows.push(row.join(','));
+    });
+
+    const csvString = csvRows.join('\n');
+    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    if (link.download !== undefined) {
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', 'receipts.csv');
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
+
   if (receipts.length === 0) {
     return (
       <Card className="text-center shadow-lg">
@@ -41,24 +86,17 @@ export default function ReceiptList({ receipts }: ReceiptListProps) {
     );
   }
 
-  const formatCurrency = (amount: string) => {
-    const number = parseFloat(amount.replace(/[^0-9.-]+/g, ""));
-    return isNaN(number) ? amount : `$${number.toFixed(2)}`;
-  };
-  
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
-  };
-
   return (
     <Card className="shadow-lg">
-      <CardHeader>
-        <CardTitle>Processed Receipts</CardTitle>
-        <CardDescription>Here is a list of all your scanned receipts.</CardDescription>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <div>
+          <CardTitle>Processed Receipts</CardTitle>
+          <CardDescription>Here is a list of all your scanned receipts.</CardDescription>
+        </div>
+        <Button onClick={handleExportCSV} variant="outline">
+          <FileDown className="mr-2 h-4 w-4" />
+          Export CSV
+        </Button>
       </CardHeader>
       <CardContent>
         <div className="rounded-md border">
@@ -80,8 +118,8 @@ export default function ReceiptList({ receipts }: ReceiptListProps) {
                   <TableCell className="font-medium">{receipt.companyName}</TableCell>
                   <TableCell className="hidden sm:table-cell text-muted-foreground">{receipt.description}</TableCell>
                   <TableCell className="hidden sm:table-cell text-muted-foreground">{formatDate(receipt.date)}</TableCell>
-                  <TableCell className="text-right font-mono hidden md:table-cell">{receipt.gst ? formatCurrency(receipt.gst) : 'N/A'}</TableCell>
-                  <TableCell className="text-right font-mono hidden md:table-cell">{receipt.pst ? formatCurrency(receipt.pst) : 'N/A'}</TableCell>
+                  <TableCell className="text-right font-mono hidden md:table-cell">{formatCurrency(receipt.gst)}</TableCell>
+                  <TableCell className="text-right font-mono hidden md:table-cell">{formatCurrency(receipt.pst)}</TableCell>
                   <TableCell className="text-right font-mono">{formatCurrency(receipt.totalAmount)}</TableCell>
                   <TableCell className="text-right">
                     <Dialog>
@@ -110,8 +148,8 @@ export default function ReceiptList({ receipts }: ReceiptListProps) {
                             <div className="space-y-2 text-sm">
                                <div className="flex justify-between"><span>Company:</span> <span className="font-medium">{receipt.companyName}</span></div>
                                <div className="flex justify-between"><span>Description:</span> <span className="font-medium">{receipt.description}</span></div>
-                               <div className="flex justify-between"><span>GST/HST:</span> <Badge variant="secondary">{receipt.gst ? formatCurrency(receipt.gst) : 'N/A'}</Badge></div>
-                               <div className="flex justify-between"><span>PST:</span> <Badge variant="secondary">{receipt.pst ? formatCurrency(receipt.pst) : 'N/A'}</Badge></div>
+                               <div className="flex justify-between"><span>GST/HST:</span> <Badge variant="secondary">{formatCurrency(receipt.gst)}</Badge></div>
+                               <div className="flex justify-between"><span>PST:</span> <Badge variant="secondary">{formatCurrency(receipt.pst)}</Badge></div>
                                <div className="flex justify-between text-base font-bold pt-2 border-t mt-2"><span>Total:</span> <span>{formatCurrency(receipt.totalAmount)}</span></div>
                             </div>
                           </div>
