@@ -23,6 +23,7 @@ export type ExtractReceiptDataInput = z.infer<typeof ExtractReceiptDataInputSche
 
 const ExtractReceiptDataOutputSchema = z.object({
   companyName: z.string().describe('The name of the company on the receipt.'),
+  description: z.string().describe('A short, one or two word description of what the receipt is for, e.g. "Groceries", "Dinner", "Gas".'),
   gst: z.string().nullable().describe('The GST amount on the receipt, if available.'),
   pst: z.string().nullable().describe('The PST amount on the receipt, if available.'),
   totalAmount: z.string().describe('The total amount on the receipt.'),
@@ -41,6 +42,7 @@ const extractReceiptDataPrompt = ai.definePrompt({
 
   Analyze the receipt image provided and extract the following information:
   - Company Name
+  - A short description of what the receipt is for (e.g. "Groceries", "Dinner", "Gas")
   - GST (if available)
   - PST (if available)
   - Total Amount

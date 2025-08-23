@@ -1,5 +1,6 @@
 export type ReceiptData = {
   companyName: string;
+  description: string;
   gst: string | null;
   pst: string | null;
   totalAmount: string;

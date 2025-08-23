@@ -66,6 +66,7 @@ export default function ReceiptList({ receipts }: ReceiptListProps) {
             <TableHeader>
               <TableRow>
                 <TableHead>Company</TableHead>
+                <TableHead className="hidden sm:table-cell">Description</TableHead>
                 <TableHead className="hidden sm:table-cell">Date</TableHead>
                 <TableHead className="text-right hidden md:table-cell">GST</TableHead>
                 <TableHead className="text-right hidden md:table-cell">PST</TableHead>
@@ -77,6 +78,7 @@ export default function ReceiptList({ receipts }: ReceiptListProps) {
               {receipts.map(receipt => (
                 <TableRow key={receipt.id}>
                   <TableCell className="font-medium">{receipt.companyName}</TableCell>
+                  <TableCell className="hidden sm:table-cell text-muted-foreground">{receipt.description}</TableCell>
                   <TableCell className="hidden sm:table-cell text-muted-foreground">{formatDate(receipt.date)}</TableCell>
                   <TableCell className="text-right font-mono hidden md:table-cell">{receipt.gst ? formatCurrency(receipt.gst) : 'N/A'}</TableCell>
                   <TableCell className="text-right font-mono hidden md:table-cell">{receipt.pst ? formatCurrency(receipt.pst) : 'N/A'}</TableCell>
@@ -107,6 +109,7 @@ export default function ReceiptList({ receipts }: ReceiptListProps) {
                             <h3 className="text-lg font-semibold">Extracted Details</h3>
                             <div className="space-y-2 text-sm">
                                <div className="flex justify-between"><span>Company:</span> <span className="font-medium">{receipt.companyName}</span></div>
+                               <div className="flex justify-between"><span>Description:</span> <span className="font-medium">{receipt.description}</span></div>
                                <div className="flex justify-between"><span>GST/HST:</span> <Badge variant="secondary">{receipt.gst ? formatCurrency(receipt.gst) : 'N/A'}</Badge></div>
                                <div className="flex justify-between"><span>PST:</span> <Badge variant="secondary">{receipt.pst ? formatCurrency(receipt.pst) : 'N/A'}</Badge></div>
                                <div className="flex justify-between text-base font-bold pt-2 border-t mt-2"><span>Total:</span> <span>{formatCurrency(receipt.totalAmount)}</span></div>
