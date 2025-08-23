@@ -42,7 +42,7 @@ export default function ReceiptList({ receipts }: ReceiptListProps) {
   };
 
   const handleExportCSV = () => {
-    const headers = ['Date', 'Company', 'Description', 'Total Amount', 'GST', 'PST', 'Image URL'];
+    const headers = ['Date', 'Company', 'Description', 'Total Amount', 'GST', 'PST'];
     const csvRows = [headers.join(',')];
 
     receipts.forEach(receipt => {
@@ -53,7 +53,6 @@ export default function ReceiptList({ receipts }: ReceiptListProps) {
         `"${receipt.totalAmount}"`,
         `"${receipt.gst || 'N/A'}"`,
         `"${receipt.pst || 'N/A'}"`,
-        `"${receipt.image}"`,
       ];
       csvRows.push(row.join(','));
     });
