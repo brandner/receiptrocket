@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
-import { useFormState, useFormStatus } from 'react-dom';
+import { useEffect, useState, useRef, useActionState } from 'react';
+import { useFormStatus } from 'react-dom';
 import Image from 'next/image';
 import { UploadCloud, X, FileText, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -42,7 +42,7 @@ function SubmitButton() {
 }
 
 export default function ReceiptUpload({ onReceiptProcessed }: ReceiptUploadProps) {
-  const [state, formAction] = useFormState(processReceiptAction, initialState);
+  const [state, formAction] = useActionState(processReceiptAction, initialState);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
