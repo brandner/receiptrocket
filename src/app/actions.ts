@@ -1,12 +1,43 @@
 'use server';
 
 import {extractReceiptData} from '@/ai/flows/extract-receipt-data';
-import type {ReceiptData} from '@/types';
+import type {Receipt, ReceiptData} from '@/types';
+import * as admin from 'firebase-admin';
+import {getApps, cert} from 'firebase-admin/app';
+import {getFirestore} from 'firebase-admin/firestore';
+
+const ANONYMOUS_USER_ID = 'anonymous';
+
+// Helper to initialize the Admin SDK and get the Firestore instance.
+// This is memoized to ensure it's only called once.
+const getDb = (() => {
+  let db: admin.firestore.Firestore | null = null;
+  return () => {
+    if (!db) {
+      if (getApps().length === 0) {
+        const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+        if (!privateKey || !process.env.FIREBASE_CLIENT_EMAIL || !process.env.FIREBASE_PROJECT_ID) {
+          throw new Error('Missing Firebase Admin SDK credentials in environment variables.');
+        }
+        admin.initializeApp({
+          credential: cert({
+            projectId: process.env.FIREBASE_PROJECT_ID,
+            clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+            privateKey,
+          })
+        });
+      }
+      db = getFirestore();
+    }
+    return db;
+  };
+})();
+
 
 type ProcessFormState = {
   message: string;
-  data: (ReceiptData & {image: string}) | null;
   error: boolean;
+  receiptId?: string;
 };
 
 export async function processReceiptAction(
@@ -15,11 +46,11 @@ export async function processReceiptAction(
 ): Promise<ProcessFormState> {
   const photo = formData.get('photo') as File;
   if (!photo || photo.size === 0) {
-    return {message: 'Please select an image file.', data: null, error: true};
+    return {message: 'Please select an image file.', error: true};
   }
 
   if (!photo.type.startsWith('image/')) {
-    return {message: 'Please select a valid image file.', data: null, error: true};
+    return {message: 'Please select a valid image file.', error: true};
   }
 
   try {
@@ -29,10 +60,20 @@ export async function processReceiptAction(
     )}`;
     const extractedData = await extractReceiptData({photoDataUri});
 
+    const newReceipt: Omit<Receipt, 'id'> = {
+      ...extractedData,
+      image: photoDataUri,
+      date: new Date().toISOString(),
+      userId: ANONYMOUS_USER_ID,
+    };
+    
+    const db = getDb();
+    const docRef = await db.collection('receipts').add(newReceipt);
+
     return {
       message: 'Receipt processed successfully!',
-      data: {...extractedData, image: photoDataUri},
       error: false,
+      receiptId: docRef.id,
     };
   } catch (e) {
     console.error(e);
@@ -40,8 +81,48 @@ export async function processReceiptAction(
       e instanceof Error ? e.message : 'An unknown error occurred.';
     return {
       message: `Failed to process receipt: ${errorMessage}`,
-      data: null,
       error: true,
     };
   }
+}
+
+export async function getReceiptsAction(): Promise<Receipt[]> {
+    try {
+        const db = getDb();
+        const snapshot = await db.collection('receipts')
+                                 .where('userId', '==', ANONYMOUS_USER_ID)
+                                 .orderBy('date', 'desc')
+                                 .get();
+
+        if (snapshot.empty) {
+            return [];
+        }
+
+        return snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...(doc.data() as Omit<Receipt, 'id'>)
+        }));
+    } catch (e) {
+        console.error(e);
+        const errorMessage = e instanceof Error ? e.message : 'An unknown error occurred.';
+        // In a real app, you might want a more sophisticated error handling/logging mechanism
+        throw new Error(`Failed to retrieve receipts: ${errorMessage}`);
+    }
+}
+
+export async function deleteReceiptAction(id: string): Promise<{ success: boolean; message: string }> {
+    if (!id) {
+        return { success: false, message: 'No receipt ID provided.' };
+    }
+    try {
+        const db = getDb();
+        // For security, you might also want to check if the receipt belongs to the user
+        // before deleting, but for the anonymous case, this is sufficient.
+        await db.collection('receipts').doc(id).delete();
+        return { success: true, message: 'Receipt deleted successfully.' };
+    } catch (e) {
+        console.error(e);
+        const errorMessage = e instanceof Error ? e.message : 'An unknown error occurred.';
+        return { success: false, message: `Failed to delete receipt: ${errorMessage}` };
+    }
 }

@@ -1,5 +1,5 @@
 import { initializeApp, getApps } from 'firebase/app';
-import { getAuth, GoogleAuthProvider } from 'firebase/auth';
+import { getFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
   projectId: "receiptrocket-h9b5k",
@@ -19,7 +19,6 @@ if (!getApps().length) {
   app = getApps()[0];
 }
 
-const auth = getAuth(app);
-const googleProvider = new GoogleAuthProvider();
+const db = getFirestore(app);
 
-export { app, auth, googleProvider };
+export { app, db };

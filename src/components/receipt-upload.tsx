@@ -10,19 +10,17 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { processReceiptAction } from '@/app/actions';
-import type { Receipt } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 
 type ReceiptUploadProps = {
-  onReceiptProcessed: (receipt: Receipt) => void;
+  onReceiptProcessed: () => void;
 };
 
 const initialState = {
   message: '',
-  data: null,
   error: false,
 };
 
@@ -55,6 +53,7 @@ export default function ReceiptUpload({ onReceiptProcessed }: ReceiptUploadProps
   const [uploadMode, setUploadMode] = useState<'upload' | 'camera'>('upload');
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const { toast } = useToast();
+  const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
     return () => {
@@ -99,21 +98,18 @@ export default function ReceiptUpload({ onReceiptProcessed }: ReceiptUploadProps
           title: 'Error',
           description: state.message,
         });
-      } else if (state.data) {
+      } else {
         toast({
           title: 'Success!',
-          description: 'Receipt data extracted.',
+          description: 'Receipt data extracted and saved.',
           action: <CheckCircle className="text-green-500" />,
         });
-        // Add a temporary ID and date for local state management
-        const newReceipt: Receipt = {
-            ...state.data,
-            id: `temp-${Date.now()}`,
-            date: new Date().toISOString(),
-            userId: 'local-user', // Placeholder
-        };
-        onReceiptProcessed(newReceipt);
+        onReceiptProcessed();
         handleRemoveImage();
+        // Reset the form state
+        if (formRef.current) {
+          formRef.current.reset();
+        }
       }
     }
   }, [state, onReceiptProcessed, toast]);
@@ -150,8 +146,6 @@ export default function ReceiptUpload({ onReceiptProcessed }: ReceiptUploadProps
       }
     }
   };
-
-  const formRef = useRef<HTMLFormElement>(null);
 
   const customFormAction = (formData: FormData) => {
     if (uploadMode === 'camera' && imagePreview) {

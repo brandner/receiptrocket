@@ -1,26 +1,66 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback, useTransition } from 'react';
 import type { Receipt } from '@/types';
 import ReceiptUpload from '@/components/receipt-upload';
 import ReceiptList from '@/components/receipt-list';
 import Logo from '@/components/logo';
 import { Card, CardContent } from '@/components/ui/card';
+import { getReceiptsAction, deleteReceiptAction } from '@/app/actions';
+import { useToast } from '@/hooks/use-toast';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function Home() {
   const [receipts, setReceipts] = useState<Receipt[]>([]);
-  const [key, setKey] = useState(Date.now());
+  const [isLoading, setIsLoading] = useState(true);
+  const { toast } = useToast();
+  const [isDeleting, startDeleteTransition] = useTransition();
 
-  const handleReceiptProcessed = (newReceipt: Receipt) => {
-    setReceipts(prev => [newReceipt, ...prev]);
-    // Reset the upload form by changing its key
-    setKey(Date.now());
+  const loadReceipts = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const fetchedReceipts = await getReceiptsAction();
+      setReceipts(fetchedReceipts);
+    } catch (error) {
+      console.error(error);
+      toast({
+        variant: 'destructive',
+        title: 'Failed to load receipts',
+        description: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [toast]);
+
+  useEffect(() => {
+    loadReceipts();
+  }, [loadReceipts]);
+  
+  const handleReceiptProcessed = () => {
+    // After a receipt is successfully processed and saved, reload the list
+    loadReceipts();
   };
 
-  const handleDeleteReceipt = (id: string) => {
-    // In a real app, you'd also make an API call to delete from the backend
-    setReceipts(prev => prev.filter(receipt => receipt.id !== id));
-  };
+  const handleDeleteReceipt = useCallback((id: string) => {
+    startDeleteTransition(async () => {
+      const result = await deleteReceiptAction(id);
+      if (result.success) {
+        toast({
+          title: 'Receipt Deleted',
+          description: 'The receipt has been removed.',
+        });
+        // Optimistically update UI or reload
+        setReceipts(prev => prev.filter(receipt => receipt.id !== id));
+      } else {
+        toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: result.message,
+        });
+      }
+    });
+  }, [toast]);
   
   return (
     <div className="flex flex-col items-center min-h-screen bg-background py-8 px-4 sm:px-6 lg:px-8">
@@ -41,11 +81,23 @@ export default function Home() {
       <main className="w-full max-w-5xl space-y-12">
         <Card className="overflow-hidden shadow-lg">
           <CardContent className="p-6">
-            <ReceiptUpload key={key} onReceiptProcessed={handleReceiptProcessed} />
+            <ReceiptUpload onReceiptProcessed={handleReceiptProcessed} />
           </CardContent>
         </Card>
         
-        <ReceiptList receipts={receipts} onDeleteReceipt={handleDeleteReceipt} />
+        {isLoading ? (
+          <div className="space-y-4">
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-full" />
+          </div>
+        ) : (
+          <ReceiptList 
+            receipts={receipts} 
+            onDeleteReceipt={handleDeleteReceipt}
+            isDeleting={isDeleting}
+          />
+        )}
       </main>
       
       <footer className="mt-12 text-center text-muted-foreground text-sm">
