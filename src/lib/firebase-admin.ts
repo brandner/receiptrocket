@@ -10,6 +10,8 @@ export function getFirebaseAdmin() {
 
   // When running in a Google Cloud environment (like Firebase App Hosting),
   // the SDK automatically discovers the service account credentials.
-  // The projectId is also automatically inferred.
-  return admin.initializeApp();
+  // We explicitly provide the project ID to ensure it connects to the correct project.
+  return admin.initializeApp({
+    projectId: 'receiptrocket-h9b5k',
+  });
 }

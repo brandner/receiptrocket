@@ -18,8 +18,9 @@ async function getUserIdFromToken(idToken: string | null) {
     const decodedToken = await getFirebaseAdmin().auth().verifyIdToken(idToken);
     return { uid: decodedToken.uid, error: null };
   } catch (error) {
-    console.error('Error verifying ID token:', error);
-    return { uid: null, error: 'Token verification failed. Please sign in again.' };
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error during token verification.';
+    console.error('Error verifying ID token:', errorMessage);
+    return { uid: null, error: `Token verification failed. Please sign in again. (Details: ${errorMessage})` };
   }
 }
 
