@@ -9,17 +9,15 @@ import { UploadCloud, X, FileText, CheckCircle, Camera, RefreshCw, Loader2 } fro
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { processReceiptAction, saveReceiptAction } from '@/app/actions';
+import { processReceiptAction } from '@/app/actions';
 import type { Receipt } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
-import type { User } from 'firebase/auth';
 
 type ReceiptUploadProps = {
   onReceiptProcessed: (receipt: Receipt) => void;
-  user: User | null;
 };
 
 const initialState = {
@@ -47,7 +45,7 @@ function SubmitButton({ disabled }: { disabled?: boolean }) {
   );
 }
 
-export default function ReceiptUpload({ onReceiptProcessed, user }: ReceiptUploadProps) {
+export default function ReceiptUpload({ onReceiptProcessed }: ReceiptUploadProps) {
   const [state, formAction] = useActionState(processReceiptAction, initialState);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -56,14 +54,7 @@ export default function ReceiptUpload({ onReceiptProcessed, user }: ReceiptUploa
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
   const [uploadMode, setUploadMode] = useState<'upload' | 'camera'>('upload');
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
-  const [idToken, setIdToken] = useState<string>('');
   const { toast } = useToast();
-
-  useEffect(() => {
-    if (user) {
-      user.getIdToken().then(setIdToken);
-    }
-  }, [user]);
 
   useEffect(() => {
     return () => {
@@ -109,29 +100,23 @@ export default function ReceiptUpload({ onReceiptProcessed, user }: ReceiptUploa
           description: state.message,
         });
       } else if (state.data) {
-        // Now that data is extracted, save it to Firestore
-        const saveAndFinish = async () => {
-          const result = await saveReceiptAction(state.data!, idToken);
-          if (result.error) {
-            toast({
-              variant: 'destructive',
-              title: 'Error Saving Receipt',
-              description: result.error,
-            });
-          } else if (result.data) {
-            toast({
-              title: 'Success!',
-              description: 'Receipt saved successfully.',
-              action: <CheckCircle className="text-green-500" />,
-            });
-            onReceiptProcessed(result.data);
-            handleRemoveImage();
-          }
+        toast({
+          title: 'Success!',
+          description: 'Receipt data extracted.',
+          action: <CheckCircle className="text-green-500" />,
+        });
+        // Add a temporary ID and date for local state management
+        const newReceipt: Receipt = {
+            ...state.data,
+            id: `temp-${Date.now()}`,
+            date: new Date().toISOString(),
+            userId: 'local-user', // Placeholder
         };
-        saveAndFinish();
+        onReceiptProcessed(newReceipt);
+        handleRemoveImage();
       }
     }
-  }, [state, onReceiptProcessed, toast, idToken]);
+  }, [state, onReceiptProcessed, toast]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -169,7 +154,6 @@ export default function ReceiptUpload({ onReceiptProcessed, user }: ReceiptUploa
   const formRef = useRef<HTMLFormElement>(null);
 
   const customFormAction = (formData: FormData) => {
-    // This function ensures the latest image from the camera is used
     if (uploadMode === 'camera' && imagePreview) {
       fetch(imagePreview)
         .then(res => res.blob())
@@ -187,7 +171,6 @@ export default function ReceiptUpload({ onReceiptProcessed, user }: ReceiptUploa
     <div>
       <h2 className="text-2xl font-bold mb-4 text-center">Upload New Receipt</h2>
       <form ref={formRef} action={customFormAction} className="space-y-6">
-        <input type="hidden" name="idToken" value={idToken} />
         <Tabs value={uploadMode} onValueChange={(value) => setUploadMode(value as any)} className="w-full mb-4">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="upload"><UploadCloud className="mr-2 h-4 w-4" /> File Upload</TabsTrigger>
