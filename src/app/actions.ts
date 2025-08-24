@@ -2,6 +2,7 @@
 
 import { extractReceiptData } from '@/ai/flows/extract-receipt-data';
 import type { ReceiptData } from '@/types';
+import { getFirebaseAdmin } from '@/lib/firebase-admin';
 
 type FormState = {
   message: string;
@@ -9,16 +10,36 @@ type FormState = {
   error: boolean;
 };
 
+async function getUserIdFromToken(idToken: string | null) {
+  if (!idToken) {
+    return { uid: null, error: 'No ID token provided.' };
+  }
+  try {
+    const decodedToken = await getFirebaseAdmin().auth().verifyIdToken(idToken);
+    return { uid: decodedToken.uid, error: null };
+  } catch (error) {
+    console.error('Error verifying ID token:', error);
+    return { uid: null, error: 'Token verification failed. Please sign in again.' };
+  }
+}
+
 export async function processReceiptAction(
   prevState: FormState,
   formData: FormData
 ): Promise<FormState> {
+  const idToken = formData.get('idToken') as string | null;
+
+  const { uid, error } = await getUserIdFromToken(idToken);
+
+  if (error || !uid) {
+    return { message: error || 'Authentication failed.', data: null, error: true };
+  }
+
   const photo = formData.get('photo') as File;
   if (!photo || photo.size === 0) {
     return { message: 'Please select an image file.', data: null, error: true };
   }
 
-  // Validate file type
   if (!photo.type.startsWith('image/')) {
     return { message: 'Please select a valid image file.', data: null, error: true };
   }

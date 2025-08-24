@@ -94,7 +94,7 @@ export default function Home() {
         <main className="w-full max-w-5xl space-y-12">
           <Card className="overflow-hidden shadow-lg">
             <CardContent className="p-6">
-              <ReceiptUpload key={key} onReceiptProcessed={handleReceiptProcessed} />
+              <ReceiptUpload key={key} onReceiptProcessed={handleReceiptProcessed} user={user} />
             </CardContent>
           </Card>
           

@@ -15,9 +15,11 @@ import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
+import type { User } from 'firebase/auth';
 
 type ReceiptUploadProps = {
   onReceiptProcessed: (receipt: Receipt) => void;
+  user: User | null;
 };
 
 const initialState = {
@@ -45,7 +47,7 @@ function SubmitButton({ disabled }: { disabled?: boolean }) {
   );
 }
 
-export default function ReceiptUpload({ onReceiptProcessed }: ReceiptUploadProps) {
+export default function ReceiptUpload({ onReceiptProcessed, user }: ReceiptUploadProps) {
   const [state, formAction] = useActionState(processReceiptAction, initialState);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -156,6 +158,22 @@ export default function ReceiptUpload({ onReceiptProcessed }: ReceiptUploadProps
       const file = new File([blob], 'receipt.jpg', { type: 'image/jpeg' });
       formData.set('photo', file);
     }
+    
+    if (user) {
+      try {
+        const idToken = await user.getIdToken();
+        formData.set('idToken', idToken);
+      } catch (error) {
+        console.error("Could not get ID token", error);
+        toast({
+          variant: 'destructive',
+          title: 'Authentication Error',
+          description: 'Could not verify your session. Please log in again.',
+        });
+        return;
+      }
+    }
+
     formAction(formData);
   };
   
