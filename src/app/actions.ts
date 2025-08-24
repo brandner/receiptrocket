@@ -1,14 +1,20 @@
 'use server';
 
 import { extractReceiptData } from '@/ai/flows/extract-receipt-data';
-import type { ReceiptData } from '@/types';
+import type { Receipt, ReceiptData } from '@/types';
 import { getFirebaseAdmin } from '@/lib/firebase-admin';
+import { getFirestore } from 'firebase-admin/firestore';
 
-type FormState = {
+type ProcessFormState = {
   message: string;
   data: (ReceiptData & { image: string }) | null;
   error: boolean;
 };
+
+type ActionResponse<T> = {
+  data: T | null;
+  error: string | null;
+}
 
 async function getUserIdFromToken(idToken: string | null) {
   if (!idToken) {
@@ -25,11 +31,10 @@ async function getUserIdFromToken(idToken: string | null) {
 }
 
 export async function processReceiptAction(
-  prevState: FormState,
+  prevState: ProcessFormState,
   formData: FormData
-): Promise<FormState> {
+): Promise<ProcessFormState> {
   const idToken = formData.get('idToken') as string | null;
-
   const { uid, error } = await getUserIdFromToken(idToken);
 
   if (error || !uid) {
@@ -48,7 +53,6 @@ export async function processReceiptAction(
   try {
     const buffer = Buffer.from(await photo.arrayBuffer());
     const photoDataUri = `data:${photo.type};base64,${buffer.toString('base64')}`;
-
     const extractedData = await extractReceiptData({ photoDataUri });
 
     return {
@@ -61,4 +65,68 @@ export async function processReceiptAction(
     const errorMessage = e instanceof Error ? e.message : 'An unknown error occurred.';
     return { message: `Failed to process receipt: ${errorMessage}`, data: null, error: true };
   }
+}
+
+export async function saveReceiptAction(
+  receiptData: ReceiptData & { image: string },
+  idToken: string | null
+): Promise<ActionResponse<Receipt>> {
+  const { uid, error } = await getUserIdFromToken(idToken);
+  if (error || !uid) {
+    return { data: null, error: error || 'Authentication failed.' };
+  }
+
+  try {
+    const db = getFirestore(getFirebaseAdmin());
+    const newReceiptRef = db.collection('users').doc(uid).collection('receipts').doc();
+
+    const newReceipt: Omit<Receipt, 'id'> = {
+      ...receiptData,
+      date: new Date().toISOString(),
+      userId: uid,
+    };
+
+    await newReceiptRef.set(newReceipt);
+
+    return { data: { ...newReceipt, id: newReceiptRef.id }, error: null };
+  } catch (e) {
+    console.error('Failed to save receipt:', e);
+    const errorMessage = e instanceof Error ? e.message : 'An unknown error occurred.';
+    return { data: null, error: `Failed to save receipt: ${errorMessage}` };
+  }
+}
+
+export async function getReceiptsAction(idToken: string | null): Promise<ActionResponse<Receipt[]>> {
+    const { uid, error } = await getUserIdFromToken(idToken);
+    if (error || !uid) {
+        return { data: null, error: error || 'Authentication failed.' };
+    }
+
+    try {
+        const db = getFirestore(getFirebaseAdmin());
+        const receiptsSnapshot = await db.collection('users').doc(uid).collection('receipts').orderBy('date', 'desc').get();
+        const receipts = receiptsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Receipt));
+        return { data: receipts, error: null };
+    } catch (e) {
+        console.error('Failed to get receipts:', e);
+        const errorMessage = e instanceof Error ? e.message : 'An unknown error occurred.';
+        return { data: null, error: `Failed to retrieve receipts: ${errorMessage}` };
+    }
+}
+
+export async function deleteReceiptAction(receiptId: string, idToken: string | null): Promise<ActionResponse<boolean>> {
+    const { uid, error } = await getUserIdFromToken(idToken);
+    if (error || !uid) {
+        return { data: null, error: error || 'Authentication failed.' };
+    }
+
+    try {
+        const db = getFirestore(getFirebaseAdmin());
+        await db.collection('users').doc(uid).collection('receipts').doc(receiptId).delete();
+        return { data: true, error: null };
+    } catch (e) {
+        console.error('Failed to delete receipt:', e);
+        const errorMessage = e instanceof Error ? e.message : 'An unknown error occurred.';
+        return { data: null, error: `Failed to delete receipt: ${errorMessage}` };
+    }
 }

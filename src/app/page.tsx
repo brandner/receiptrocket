@@ -1,37 +1,68 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type { User } from 'firebase/auth';
 import { auth, googleProvider } from '@/lib/firebase';
 import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
 import type { Receipt } from '@/types';
+import { getReceiptsAction, deleteReceiptAction } from '@/app/actions';
 import ReceiptUpload from '@/components/receipt-upload';
 import ReceiptList from '@/components/receipt-list';
 import Logo from '@/components/logo';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { LogIn, LogOut } from 'lucide-react';
+import { LogIn, LogOut, Loader2 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 export default function Home() {
   const [receipts, setReceipts] = useState<Receipt[]>([]);
   const [key, setKey] = useState(Date.now());
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingReceipts, setLoadingReceipts] = useState(false);
+  const { toast } = useToast();
+
+  const loadReceipts = useCallback(async (idToken: string) => {
+    setLoadingReceipts(true);
+    const result = await getReceiptsAction(idToken);
+    if (result.error) {
+      console.error(result.error);
+      toast({
+        variant: 'destructive',
+        title: 'Error loading receipts',
+        description: result.error,
+      });
+    } else if (result.data) {
+      setReceipts(result.data);
+    }
+    setLoadingReceipts(false);
+  }, [toast]);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
+      if (currentUser) {
+        const idToken = await currentUser.getIdToken();
+        await loadReceipts(idToken);
+      } else {
+        setReceipts([]); // Clear receipts on logout
+      }
       setLoading(false);
     });
     // Cleanup subscription on unmount
     return () => unsubscribe();
-  }, []);
+  }, [loadReceipts]);
 
   const handleSignIn = async () => {
     try {
       await signInWithPopup(auth, googleProvider);
     } catch (error) {
       console.error('Error signing in with Google', error);
+      toast({
+        variant: 'destructive',
+        title: 'Sign In Failed',
+        description: 'Could not sign in with Google. Please try again.',
+      });
     }
   };
 
@@ -40,6 +71,11 @@ export default function Home() {
       await signOut(auth);
     } catch (error) {
       console.error('Error signing out', error);
+      toast({
+        variant: 'destructive',
+        title: 'Sign Out Failed',
+        description: 'Could not sign out. Please try again.',
+      });
     }
   };
 
@@ -49,8 +85,23 @@ export default function Home() {
     setKey(Date.now());
   };
 
-  const handleDeleteReceipt = (id: string) => {
-    setReceipts(prev => prev.filter(receipt => receipt.id !== id));
+  const handleDeleteReceipt = async (id: string) => {
+    if (!user) return;
+    const idToken = await user.getIdToken();
+    const result = await deleteReceiptAction(id, idToken);
+    if (result.error) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: result.error,
+      });
+    } else {
+      toast({
+        title: 'Success',
+        description: 'Receipt deleted successfully.',
+      });
+      setReceipts(prev => prev.filter(receipt => receipt.id !== id));
+    }
   };
 
   if (loading) {
@@ -98,7 +149,14 @@ export default function Home() {
             </CardContent>
           </Card>
           
-          <ReceiptList receipts={receipts} onDeleteReceipt={handleDeleteReceipt} />
+          {loadingReceipts ? (
+            <div className="flex justify-center items-center py-10">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <p className="ml-4 text-muted-foreground">Loading your receipts...</p>
+            </div>
+          ) : (
+            <ReceiptList receipts={receipts} onDeleteReceipt={handleDeleteReceipt} />
+          )}
         </main>
       )}
       

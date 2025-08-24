@@ -1,10 +1,11 @@
 import admin from 'firebase-admin';
+import { getApps } from 'firebase-admin/app';
 
 /**
  * @returns {admin.app.App} The initialized Firebase Admin app instance.
  */
 export function getFirebaseAdmin() {
-  if (admin.apps.length > 0) {
+  if (getApps().length > 0) {
     return admin.app();
   }
 

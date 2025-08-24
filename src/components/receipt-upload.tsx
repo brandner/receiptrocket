@@ -9,7 +9,7 @@ import { UploadCloud, X, FileText, CheckCircle, Camera, RefreshCw, Loader2 } fro
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { processReceiptAction } from '@/app/actions';
+import { processReceiptAction, saveReceiptAction } from '@/app/actions';
 import type { Receipt } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -109,21 +109,29 @@ export default function ReceiptUpload({ onReceiptProcessed, user }: ReceiptUploa
           description: state.message,
         });
       } else if (state.data) {
-        toast({
-          title: 'Success!',
-          description: state.message,
-          action: <CheckCircle className="text-green-500" />,
-        });
-        const newReceipt: Receipt = {
-          id: crypto.randomUUID(),
-          date: new Date().toISOString(),
-          ...state.data,
+        // Now that data is extracted, save it to Firestore
+        const saveAndFinish = async () => {
+          const result = await saveReceiptAction(state.data!, idToken);
+          if (result.error) {
+            toast({
+              variant: 'destructive',
+              title: 'Error Saving Receipt',
+              description: result.error,
+            });
+          } else if (result.data) {
+            toast({
+              title: 'Success!',
+              description: 'Receipt saved successfully.',
+              action: <CheckCircle className="text-green-500" />,
+            });
+            onReceiptProcessed(result.data);
+            handleRemoveImage();
+          }
         };
-        onReceiptProcessed(newReceipt);
-        handleRemoveImage();
+        saveAndFinish();
       }
     }
-  }, [state, onReceiptProcessed, toast]);
+  }, [state, onReceiptProcessed, toast, idToken]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -160,7 +168,8 @@ export default function ReceiptUpload({ onReceiptProcessed, user }: ReceiptUploa
 
   const formRef = useRef<HTMLFormElement>(null);
 
-  const handleFormAction = (formData: FormData) => {
+  const customFormAction = (formData: FormData) => {
+    // This function ensures the latest image from the camera is used
     if (uploadMode === 'camera' && imagePreview) {
       fetch(imagePreview)
         .then(res => res.blob())
@@ -177,7 +186,7 @@ export default function ReceiptUpload({ onReceiptProcessed, user }: ReceiptUploa
   return (
     <div>
       <h2 className="text-2xl font-bold mb-4 text-center">Upload New Receipt</h2>
-      <form ref={formRef} action={handleFormAction} className="space-y-6">
+      <form ref={formRef} action={customFormAction} className="space-y-6">
         <input type="hidden" name="idToken" value={idToken} />
         <Tabs value={uploadMode} onValueChange={(value) => setUploadMode(value as any)} className="w-full mb-4">
           <TabsList className="grid w-full grid-cols-2">

@@ -10,4 +10,5 @@ export type Receipt = {
   id: string;
   image: string; // data URI
   date: string; // ISO string
+  userId: string;
 } & ReceiptData;
