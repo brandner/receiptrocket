@@ -56,7 +56,14 @@ export default function ReceiptUpload({ onReceiptProcessed, user }: ReceiptUploa
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
   const [uploadMode, setUploadMode] = useState<'upload' | 'camera'>('upload');
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+  const [idToken, setIdToken] = useState<string>('');
   const { toast } = useToast();
+
+  useEffect(() => {
+    if (user) {
+      user.getIdToken().then(setIdToken);
+    }
+  }, [user]);
 
   useEffect(() => {
     return () => {
@@ -151,36 +158,27 @@ export default function ReceiptUpload({ onReceiptProcessed, user }: ReceiptUploa
     }
   };
 
-  const customFormAction = async (formData: FormData) => {
-    if (uploadMode === 'camera' && imagePreview) {
-      const response = await fetch(imagePreview);
-      const blob = await response.blob();
-      const file = new File([blob], 'receipt.jpg', { type: 'image/jpeg' });
-      formData.set('photo', file);
-    }
-    
-    if (user) {
-      try {
-        const idToken = await user.getIdToken();
-        formData.set('idToken', idToken);
-      } catch (error) {
-        console.error("Could not get ID token", error);
-        toast({
-          variant: 'destructive',
-          title: 'Authentication Error',
-          description: 'Could not verify your session. Please log in again.',
-        });
-        return;
-      }
-    }
+  const formRef = useRef<HTMLFormElement>(null);
 
-    formAction(formData);
+  const handleFormAction = (formData: FormData) => {
+    if (uploadMode === 'camera' && imagePreview) {
+      fetch(imagePreview)
+        .then(res => res.blob())
+        .then(blob => {
+          const file = new File([blob], 'receipt.jpg', { type: 'image/jpeg' });
+          formData.set('photo', file);
+          formAction(formData);
+        });
+    } else {
+      formAction(formData);
+    }
   };
   
   return (
     <div>
       <h2 className="text-2xl font-bold mb-4 text-center">Upload New Receipt</h2>
-      <form action={customFormAction} className="space-y-6">
+      <form ref={formRef} action={handleFormAction} className="space-y-6">
+        <input type="hidden" name="idToken" value={idToken} />
         <Tabs value={uploadMode} onValueChange={(value) => setUploadMode(value as any)} className="w-full mb-4">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="upload"><UploadCloud className="mr-2 h-4 w-4" /> File Upload</TabsTrigger>
