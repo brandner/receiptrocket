@@ -17,6 +17,10 @@ export default function Home() {
     setKey(Date.now());
   };
 
+  const handleDeleteReceipt = (id: string) => {
+    setReceipts(prev => prev.filter(receipt => receipt.id !== id));
+  };
+
   return (
     <div className="flex flex-col items-center min-h-screen bg-background py-8 px-4 sm:px-6 lg:px-8">
       <header className="flex flex-col items-center text-center mb-8">
@@ -35,7 +39,7 @@ export default function Home() {
           </CardContent>
         </Card>
         
-        <ReceiptList receipts={receipts} />
+        <ReceiptList receipts={receipts} onDeleteReceipt={handleDeleteReceipt} />
       </main>
       <footer className="mt-12 text-center text-muted-foreground text-sm">
         <p>Built with Next.js and Genkit. A Firebase Studio Project.</p>
