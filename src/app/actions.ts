@@ -36,7 +36,7 @@ const initializeFirebaseAdmin = () => {
   try {
     const app = admin.initializeApp({
       credential: admin.credential.cert(credentials),
-      storageBucket: `${process.env.FIREBASE_PROJECT_ID}.appspot.com`,
+      storageBucket: `receiptrocket-h9b5k.appspot.com`,
     });
     db = getFirestore(app);
     storage = getStorage(app);
@@ -60,6 +60,7 @@ export async function processAndSaveReceiptAction(
   formData: FormData
 ): Promise<ProcessAndSaveState> {
     const photo = formData.get('photo') as File;
+
     if (!photo || photo.size === 0) {
         return {message: 'Please select an image file.', error: true};
     }
@@ -144,10 +145,7 @@ export async function processAndSaveReceiptAction(
 
 export async function getReceiptsAction(): Promise<Receipt[]> {
     if (!db) {
-        const message = "Firestore is not initialized. Cannot fetch receipts.";
-        console.error(message);
-        // During development, this might run before initialization is complete.
-        // Return empty array and let the UI handle it. A hard error can be disruptive.
+        console.error("Firestore is not initialized. Cannot fetch receipts.");
         return [];
     }
     try {
@@ -213,7 +211,10 @@ export async function deleteReceiptAction(id: string): Promise<{ success: boolea
                 const url = new URL(receiptData.image);
                 const pathName = decodeURIComponent(url.pathname);
                 // The actual file path in the bucket is usually after the bucket name and '/o/'
-                const filePath = pathName.substring(pathName.indexOf('/o/') + 3);
+                // e.g. /v0/b/your-bucket.appspot.com/o/receipts%2F...
+                const prefix = `/v0/b/${storage.bucket().name}/o/`;
+                const filePath = pathName.startsWith(prefix) ? pathName.substring(prefix.length) : '';
+
                 if (filePath) {
                     await storage.bucket().file(filePath).delete();
                 }
