@@ -5,7 +5,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 import Image from 'next/image';
-import { UploadCloud, X, FileText, CheckCircle, Camera, RefreshCw, Loader2, Save } from 'lucide-react';
+import { UploadCloud, X, FileText, CheckCircle, Camera, RefreshCw, Loader2, Save, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -57,6 +57,8 @@ export default function ReceiptUpload({ onReceiptProcessed }: ReceiptUploadProps
   const { toast } = useToast();
   const formRef = useRef<HTMLFormElement>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [permissionError, setPermissionError] = useState(false);
+
 
   useEffect(() => {
     return () => {
@@ -109,11 +111,12 @@ export default function ReceiptUpload({ onReceiptProcessed }: ReceiptUploadProps
         });
         
         // Pass to parent to display in the list (temporary)
-        onReceiptProcessed(state.receipt);
+        // onReceiptProcessed(state.receipt);
 
         // Now, save to firestore
         const save = async () => {
           setIsSaving(true);
+          setPermissionError(false); // Reset permission error state
           const newReceipt: Omit<Receipt, 'id'> = {
               ...state.receipt!,
               date: new Date().toISOString(),
@@ -123,6 +126,9 @@ export default function ReceiptUpload({ onReceiptProcessed }: ReceiptUploadProps
           setIsSaving(false);
 
           if (saveResult.error) {
+            if (saveResult.permissionError) {
+              setPermissionError(true);
+            }
              toast({
               variant: 'destructive',
               title: 'Error Saving Receipt',
@@ -130,8 +136,8 @@ export default function ReceiptUpload({ onReceiptProcessed }: ReceiptUploadProps
             });
           } else {
              toast({
-              title: 'Receipt Saved!',
-              description: 'The receipt has been saved to the database.',
+              title: 'Data Logged!',
+              description: 'Check server console. Saving is disabled until permissions are fixed.',
               action: <Save className="text-blue-500" />,
             });
           }
@@ -198,6 +204,24 @@ export default function ReceiptUpload({ onReceiptProcessed }: ReceiptUploadProps
   return (
     <div>
       <h2 className="text-2xl font-bold mb-4 text-center">Upload New Receipt</h2>
+
+      {permissionError && (
+        <Alert variant="destructive" className="mb-4">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Action Required: Permission Denied</AlertTitle>
+          <AlertDescription>
+            The application's service account needs permission to save data.
+            <ol className="list-decimal pl-5 mt-2 space-y-1">
+              <li>Go to the <a href={`https://console.cloud.google.com/iam-admin/iam?project=${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}`} target="_blank" rel="noopener noreferrer" className="font-semibold underline">Google Cloud IAM page</a> for your project.</li>
+              <li>Find the principal with the email: <br/><code className="text-xs bg-destructive-foreground/20 p-1 rounded">{process.env.NEXT_PUBLIC_FIREBASE_CLIENT_EMAIL}</code></li>
+              <li>Click the pencil icon to edit its roles.</li>
+              <li>Add the **Cloud Datastore User** role.</li>
+              <li>Click **Save**. The changes may take a minute to apply.</li>
+            </ol>
+          </AlertDescription>
+        </Alert>
+      )}
+
       <form ref={formRef} action={customFormAction} className="space-y-6">
         <Tabs value={uploadMode} onValueChange={(value) => setUploadMode(value as any)} className="w-full mb-4">
           <TabsList className="grid w-full grid-cols-2">

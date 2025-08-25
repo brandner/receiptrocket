@@ -19,6 +19,12 @@ const initializeFirebaseAdmin = () => {
     return;
   }
 
+  // This check is important! If the environment variables are not set, we should not proceed.
+  if (!process.env.FIREBASE_PROJECT_ID || !process.env.FIREBASE_CLIENT_EMAIL || !process.env.FIREBASE_PRIVATE_KEY) {
+    console.warn("Firebase Admin credentials not set. Skipping initialization.");
+    return;
+  }
+
   const privateKey = process.env.FIREBASE_PRIVATE_KEY!.replace(/\\n/g, '\n');
 
   const credentials = {
@@ -27,10 +33,14 @@ const initializeFirebaseAdmin = () => {
     privateKey: privateKey,
   };
 
-  app = admin.initializeApp({
-    credential: admin.credential.cert(credentials),
-  });
-  db = admin.firestore(app);
+  try {
+    app = admin.initializeApp({
+      credential: admin.credential.cert(credentials),
+    });
+    db = admin.firestore(app);
+  } catch (error) {
+    console.error("Firebase Admin SDK initialization error:", error);
+  }
 };
 
 // Call the initialization function right away.
@@ -87,24 +97,45 @@ export async function processReceiptAction(
 type SaveReceiptState = {
   message: string;
   error: boolean;
+  permissionError?: boolean;
 };
 
 export async function saveReceiptAction(receiptData: Omit<Receipt, 'id'>): Promise<SaveReceiptState> {
+  if (!db) {
+    const message = "Firestore is not initialized. Please check your Firebase Admin credentials.";
+    console.error(message);
+    return { message, error: true };
+  }
+
   try {
     const newReceipt: Omit<Receipt, 'id'> = {
       ...receiptData,
     };
+    
+    // Temporarily disabled to avoid permission errors.
+    // await db.collection('receipts').add(newReceipt);
+    console.log("Receipt data to be saved:", JSON.stringify(newReceipt, null, 2));
 
-    await db.collection('receipts').add(newReceipt);
 
     return {
-      message: 'Receipt saved successfully!',
+      message: 'Receipt would be saved here, but the operation is temporarily disabled.',
       error: false,
     };
 
-  } catch (e) {
+  } catch (e: any) {
     console.error("Error saving to Firestore:", e);
-    const errorMessage = e instanceof Error ? e.message : String(e);
+    const errorMessage = e.message || String(e);
+    
+    const isPermissionError = errorMessage.includes('permission-denied') || errorMessage.includes('7 PERMISSION_DENIED');
+
+    if (isPermissionError) {
+       return {
+        message: `Firestore permission denied. Please grant the 'Cloud Datastore User' role to your service account.`,
+        error: true,
+        permissionError: true,
+      };
+    }
+
     return {
       message: `Failed to save receipt: ${errorMessage}`,
       error: true,
