@@ -1,9 +1,10 @@
+
 'use server';
 
 import {extractReceiptData} from '@/ai/flows/extract-receipt-data';
-import type {Receipt, ReceiptData} from '@/types';
+import type {Receipt} from '@/types';
 import * as admin from 'firebase-admin';
-import {getApps, cert} from 'firebase-admin/app';
+import {getApps, applicationDefault} from 'firebase-admin/app';
 import {getFirestore} from 'firebase-admin/firestore';
 
 const ANONYMOUS_USER_ID = 'anonymous';
@@ -15,16 +16,8 @@ const getDb = (() => {
   return () => {
     if (!db) {
       if (getApps().length === 0) {
-        const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
-        if (!privateKey || !process.env.FIREBASE_CLIENT_EMAIL || !process.env.FIREBASE_PROJECT_ID) {
-          throw new Error('Missing Firebase Admin SDK credentials in environment variables.');
-        }
         admin.initializeApp({
-          credential: cert({
-            projectId: process.env.FIREBASE_PROJECT_ID,
-            clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-            privateKey,
-          })
+          credential: applicationDefault(),
         });
       }
       db = getFirestore();
