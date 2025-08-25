@@ -60,7 +60,7 @@ export default function ReceiptList({ receipts, onDeleteReceipt }: ReceiptListPr
   };
 
   const handleExportCSV = () => {
-    const headers = ['Date', 'Company', 'Description', 'Total Amount', 'GST', 'PST'];
+    const headers = ['Date', 'Company', 'Description', 'Total Amount', 'GST', 'PST', 'Image URL'];
     const csvRows = [headers.join(',')];
 
     receipts.forEach(receipt => {
@@ -71,6 +71,7 @@ export default function ReceiptList({ receipts, onDeleteReceipt }: ReceiptListPr
         `"${receipt.totalAmount}"`,
         `"${receipt.gst || 'N/A'}"`,
         `"${receipt.pst || 'N/A'}"`,
+        `"${receipt.image || 'N/A'}"`,
       ];
       csvRows.push(row.join(','));
     });
@@ -157,7 +158,7 @@ export default function ReceiptList({ receipts, onDeleteReceipt }: ReceiptListPr
                                     <Image
                                       src={receipt.image}
                                       alt={`Receipt from ${receipt.companyName}`}
-                                      layout="fill"
+                                      fill
                                       objectFit="contain"
                                       data-ai-hint="receipt document"
                                     />
