@@ -4,22 +4,18 @@
 import {extractReceiptData} from '@/ai/flows/extract-receipt-data';
 import type {Receipt} from '@/types';
 import admin, { type App, type ServiceAccount } from 'firebase-admin';
-import type { Firestore } from 'firebase-admin/firestore';
+import { getFirestore, type Firestore } from 'firebase-admin/firestore';
+import { revalidatePath } from 'next/cache';
 
 // --- Firebase Admin Initialization ---
-// This is the definitive, robust way to initialize the Firebase Admin SDK in a Next.js server environment.
-// It ensures the SDK is initialized only once, using credentials from environment variables.
-let app: App;
 let db: Firestore;
 
 const initializeFirebaseAdmin = () => {
   if (admin.apps.length > 0) {
-    app = admin.app();
-    db = admin.firestore(app);
+    db = getFirestore(admin.app());
     return;
   }
 
-  // This check is important! If the environment variables are not set, we should not proceed.
   if (!process.env.FIREBASE_PROJECT_ID || !process.env.FIREBASE_CLIENT_EMAIL || !process.env.FIREBASE_PRIVATE_KEY) {
     console.warn("Firebase Admin credentials not set. Skipping initialization.");
     return;
@@ -27,23 +23,22 @@ const initializeFirebaseAdmin = () => {
 
   const privateKey = process.env.FIREBASE_PRIVATE_KEY!.replace(/\\n/g, '\n');
 
-  const credentials = {
+  const credentials: ServiceAccount = {
     projectId: process.env.FIREBASE_PROJECT_ID!,
     clientEmail: process.env.FIREBASE_CLIENT_EMAIL!,
     privateKey: privateKey,
   };
 
   try {
-    app = admin.initializeApp({
+    const app = admin.initializeApp({
       credential: admin.credential.cert(credentials),
     });
-    db = admin.firestore(app);
+    db = getFirestore(app);
   } catch (error) {
     console.error("Firebase Admin SDK initialization error:", error);
   }
 };
 
-// Call the initialization function right away.
 initializeFirebaseAdmin();
 // --- End Firebase Admin Initialization ---
 
@@ -113,7 +108,7 @@ export async function saveReceiptAction(receiptData: Omit<Receipt, 'id'>): Promi
     };
     
     await db.collection('receipts').add(newReceipt);
-
+    revalidatePath('/');
     return {
       message: 'Receipt saved successfully to Firestore!',
       error: false,
@@ -138,4 +133,60 @@ export async function saveReceiptAction(receiptData: Omit<Receipt, 'id'>): Promi
       error: true,
     };
   }
+}
+
+
+export async function getReceiptsAction(): Promise<Receipt[]> {
+    if (!db) {
+        const message = "Firestore is not initialized. Cannot fetch receipts.";
+        console.error(message);
+        throw new Error(message);
+    }
+    try {
+        const receiptsSnapshot = await db.collection('receipts')
+            .where('userId', '==', 'anonymous')
+            .orderBy('date', 'desc')
+            .get();
+
+        if (receiptsSnapshot.empty) {
+            return [];
+        }
+
+        const receipts: Receipt[] = receiptsSnapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+                id: doc.id,
+                companyName: data.companyName,
+                description: data.description,
+                totalAmount: data.totalAmount,
+                gst: data.gst || null,
+                pst: data.pst || null,
+                date: data.date,
+                image: data.image,
+                userId: data.userId,
+            };
+        });
+        return receipts;
+    } catch (e: any) {
+        console.error("Firestore Error in getReceiptsAction:", e);
+        const errorMessage = e.message || String(e);
+        throw new Error(`Failed to retrieve receipts: ${errorMessage}`);
+    }
+}
+
+export async function deleteReceiptAction(id: string): Promise<{ success: boolean, message: string }> {
+    if (!db) {
+        const message = "Firestore is not initialized. Cannot delete receipt.";
+        console.error(message);
+        return { success: false, message };
+    }
+    try {
+        await db.collection('receipts').doc(id).delete();
+        revalidatePath('/');
+        return { success: true, message: 'Receipt deleted successfully.' };
+    } catch (e: any) {
+        console.error("Error deleting from Firestore:", e);
+        const errorMessage = e.message || String(e);
+        return { success: false, message: `Failed to delete receipt: ${errorMessage}` };
+    }
 }

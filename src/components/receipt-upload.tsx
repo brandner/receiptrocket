@@ -17,7 +17,7 @@ import { cn } from '@/lib/utils';
 import type { Receipt } from '@/types';
 
 type ReceiptUploadProps = {
-  onReceiptProcessed: (receipt: Omit<Receipt, 'id' | 'date'>) => void;
+  onUploadSuccess: () => void;
 };
 
 const initialState = {
@@ -45,7 +45,7 @@ function SubmitButton({ disabled }: { disabled?: boolean }) {
   );
 }
 
-export default function ReceiptUpload({ onReceiptProcessed }: ReceiptUploadProps) {
+export default function ReceiptUpload({ onUploadSuccess }: ReceiptUploadProps) {
   const [state, formAction] = useActionState(processReceiptAction, initialState);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -95,64 +95,61 @@ export default function ReceiptUpload({ onReceiptProcessed }: ReceiptUploadProps
     }
   }, [uploadMode, hasCameraPermission, toast, cameraStream]);
 
-  useEffect(() => {
-    if (state.message) {
-      if (state.error) {
-        toast({
-          variant: 'destructive',
-          title: 'Error',
-          description: state.message,
-        });
-      } else if (state.receipt) {
-        toast({
-          title: 'Success!',
-          description: 'Receipt data extracted. Now saving...',
-          action: <CheckCircle className="text-green-500" />,
-        });
-        
-        // Pass to parent to display in the list (temporary)
-        // onReceiptProcessed(state.receipt);
-
-        // Now, save to firestore
-        const save = async () => {
-          setIsSaving(true);
-          setPermissionError(false); // Reset permission error state
-          const newReceipt: Omit<Receipt, 'id'> = {
-              ...state.receipt!,
-              date: new Date().toISOString(),
-              userId: 'anonymous'
-          };
-          const saveResult = await saveReceiptAction(newReceipt);
-          setIsSaving(false);
-
-          if (saveResult.error) {
-            if (saveResult.permissionError) {
-              setPermissionError(true);
-            }
-             toast({
-              variant: 'destructive',
-              title: 'Error Saving Receipt',
-              description: saveResult.message,
-            });
-          } else {
-             toast({
-              title: 'Receipt Saved!',
-              description: 'The receipt was successfully saved to the database.',
-              action: <Save className="text-blue-500" />,
-            });
-          }
-        };
-
-        save();
-
-        // Reset form
-        handleRemoveImage();
-        if (formRef.current) {
-          formRef.current.reset();
-        }
-      }
+  const resetForm = () => {
+    handleRemoveImage();
+    if (formRef.current) {
+      formRef.current.reset();
     }
-  }, [state, onReceiptProcessed, toast]);
+  }
+
+  useEffect(() => {
+    if (state.message && !state.error && state.receipt) {
+      toast({
+        title: 'Success!',
+        description: 'Receipt data extracted. Now saving...',
+        action: <CheckCircle className="text-green-500" />,
+      });
+      
+      const save = async () => {
+        setIsSaving(true);
+        setPermissionError(false);
+        const newReceipt: Omit<Receipt, 'id'> = {
+            ...state.receipt!,
+            date: new Date().toISOString(),
+            userId: 'anonymous'
+        };
+        const saveResult = await saveReceiptAction(newReceipt);
+        setIsSaving(false);
+
+        if (saveResult.error) {
+          if (saveResult.permissionError) {
+            setPermissionError(true);
+          }
+           toast({
+            variant: 'destructive',
+            title: 'Error Saving Receipt',
+            description: saveResult.message,
+          });
+        } else {
+           toast({
+            title: 'Receipt Saved!',
+            description: 'The receipt was successfully saved to the database.',
+            action: <Save className="text-blue-500" />,
+          });
+          onUploadSuccess(); // Trigger data refresh
+          resetForm(); // Reset form on successful save
+        }
+      };
+
+      save();
+    } else if (state.message && state.error) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: state.message,
+      });
+    }
+  }, [state, onUploadSuccess, toast]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];

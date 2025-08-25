@@ -1,3 +1,4 @@
+
 'use client';
 
 import Image from 'next/image';
@@ -40,17 +41,22 @@ type ReceiptListProps = {
 
 export default function ReceiptList({ receipts, onDeleteReceipt }: ReceiptListProps) {
   const formatCurrency = (amount: string | null) => {
-    if (amount === null) return 'N/A';
-    const number = parseFloat(amount.replace(/[^0-9.-]+/g, ""));
-    return isNaN(number) ? amount : `$${number.toFixed(2)}`;
+    if (amount === null || amount === undefined) return 'N/A';
+    const number = parseFloat(String(amount).replace(/[^0-9.-]+/g, ""));
+    return isNaN(number) ? String(amount) : `$${number.toFixed(2)}`;
   };
   
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
+    if (!dateString) return 'Invalid Date';
+    try {
+      return new Date(dateString).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      });
+    } catch (e) {
+      return 'Invalid Date';
+    }
   };
 
   const handleExportCSV = () => {
