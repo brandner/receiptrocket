@@ -119,15 +119,7 @@ export async function saveReceiptAction(receiptData: Omit<Receipt, 'id'>): Promi
     const errorMessage = e.message || String(e);
     
     const isPermissionError = errorMessage.includes('permission-denied') || errorMessage.includes('7 PERMISSION_DENIED');
-    const isNotFoundError = errorMessage.includes('5 NOT_FOUND');
-
-    if (isNotFoundError) {
-      return {
-        message: 'Firestore database not found. Please create a Firestore database in your Firebase project console.',
-        error: true,
-      };
-    }
-
+    
     if (isPermissionError) {
        return {
         message: `Firestore permission denied. Please grant the 'Cloud Datastore User' role to your service account.`,
@@ -153,6 +145,7 @@ export async function getReceiptsAction(): Promise<Receipt[]> {
     try {
         const receiptsSnapshot = await db.collection('receipts')
             .where('userId', '==', 'anonymous')
+            .orderBy('date', 'desc')
             .get();
 
         if (receiptsSnapshot.empty) {
@@ -177,10 +170,6 @@ export async function getReceiptsAction(): Promise<Receipt[]> {
     } catch (e: any) {
         console.error("Firestore Error in getReceiptsAction:", e);
         const errorMessage = e.message || String(e);
-
-        if (errorMessage.includes('5 NOT_FOUND')) {
-             throw new Error('Firestore database not found. Please go to the Firebase Console to create a Firestore database.');
-        }
 
         throw new Error(`Failed to retrieve receipts: ${errorMessage}`);
     }
