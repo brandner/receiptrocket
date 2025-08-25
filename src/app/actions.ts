@@ -145,7 +145,6 @@ export async function getReceiptsAction(): Promise<Receipt[]> {
     try {
         const receiptsSnapshot = await db.collection('receipts')
             .where('userId', '==', 'anonymous')
-            .orderBy('date', 'desc')
             .get();
 
         if (receiptsSnapshot.empty) {

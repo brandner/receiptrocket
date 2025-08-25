@@ -24,7 +24,9 @@ export default function Home() {
     setError(null);
     try {
       const fetchedReceipts = await getReceiptsAction();
-      setReceipts(fetchedReceipts);
+      // Sort by date client-side
+      const sortedReceipts = fetchedReceipts.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      setReceipts(sortedReceipts);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred.';
       setError(errorMessage);
