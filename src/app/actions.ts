@@ -48,125 +48,97 @@ const initializeFirebaseAdmin = () => {
 initializeFirebaseAdmin();
 // --- End Firebase Admin Initialization ---
 
-type ProcessFormState = {
-  message: string;
-  error: boolean;
-  receipt?: Omit<Receipt, 'id' | 'date'>;
-};
-
-export async function processReceiptAction(
-  prevState: ProcessFormState,
-  formData: FormData
-): Promise<ProcessFormState> {
-  const photo = formData.get('photo') as File;
-  if (!photo || photo.size === 0) {
-    return {message: 'Please select an image file.', error: true};
-  }
-
-  if (!photo.type.startsWith('image/')) {
-    return {message: 'Please select a valid image file.', error: true};
-  }
-
-  try {
-    const buffer = Buffer.from(await photo.arrayBuffer());
-    const photoDataUri = `data:${photo.type};base64,${buffer.toString(
-      'base64'
-    )}`;
-    const extractedData = await extractReceiptData({photoDataUri});
-
-    const newReceiptData = {
-      ...extractedData,
-      image: photoDataUri, // Temporary, will be replaced by URL after upload
-    };
-
-    return {
-      message: 'Receipt processed successfully!',
-      error: false,
-      receipt: newReceiptData,
-    };
-  } catch (e) {
-    console.error(e);
-    const errorMessage =
-      e instanceof Error ? e.message : 'An unknown error occurred.';
-    return {
-      message: `Failed to process receipt: ${errorMessage}`,
-      error: true,
-    };
-  }
-}
-
-type SaveReceiptState = {
+type ProcessAndSaveState = {
   message: string;
   error: boolean;
   permissionError?: boolean;
 };
 
-export async function saveReceiptAction(receiptData: Omit<Receipt, 'id'>): Promise<SaveReceiptState> {
-  if (!db || !storage) {
-    const message = "Firestore or Storage is not initialized. Please check your Firebase Admin credentials.";
-    console.error(message);
-    return { message, error: true };
-  }
 
-  try {
-    // 1. Upload image to Firebase Storage
-    const { image: imageDataUri, ...receiptToSave } = receiptData;
-    const buffer = Buffer.from(imageDataUri.split(',')[1], 'base64');
-    const mimeType = imageDataUri.match(/data:(.*);base64/)?.[1] || 'image/jpeg';
-    const fileName = `receipts/${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
-    const file = storage.bucket().file(fileName);
-
-    await file.save(buffer, {
-      metadata: {
-        contentType: mimeType,
-      },
-    });
-    
-    // Get public URL
-    const [publicUrl] = await file.getSignedUrl({
-        action: 'read',
-        expires: '01-01-2500' // Far future expiration date
-    });
-
-    // 2. Save receipt data with image URL to Firestore
-    const newReceipt: Omit<Receipt, 'id'> = {
-      ...receiptToSave,
-      image: publicUrl, // Store the public URL
-    };
-    
-    await db.collection('receipts').add(newReceipt);
-    revalidatePath('/');
-    return {
-      message: 'Receipt saved successfully to Firestore!',
-      error: false,
-    };
-
-  } catch (e: any) {
-    console.error("Error saving to Firestore/Storage:", e);
-    
-    if (e.code === 5) {
-      return {
-        message: "Firestore database not found. Please go to the Firebase Console to create a Firestore database.",
-        error: true,
-      };
+export async function processAndSaveReceiptAction(
+  prevState: ProcessAndSaveState,
+  formData: FormData
+): Promise<ProcessAndSaveState> {
+    const photo = formData.get('photo') as File;
+    if (!photo || photo.size === 0) {
+        return {message: 'Please select an image file.', error: true};
     }
 
-    const errorMessage = e.message || String(e);
-    const isPermissionError = errorMessage.includes('permission-denied') || errorMessage.includes('7 PERMISSION_DENIED');
+    if (!photo.type.startsWith('image/')) {
+        return {message: 'Please select a valid image file.', error: true};
+    }
     
-    if (isPermissionError) {
-       return {
-        message: `Firestore/Storage permission denied. Please grant the 'Cloud Datastore User' and 'Storage Admin' roles to your service account.`,
-        error: true,
-        permissionError: true,
-      };
+    if (!db || !storage) {
+        const message = "Firestore or Storage is not initialized. Please check your Firebase Admin credentials.";
+        console.error(message);
+        return { message, error: true };
     }
 
-    return {
-      message: `Failed to save receipt: ${errorMessage}`,
-      error: true,
-    };
-  }
+    try {
+        // 1. Extract data from image using Genkit
+        const buffer = Buffer.from(await photo.arrayBuffer());
+        const photoDataUri = `data:${photo.type};base64,${buffer.toString('base64')}`;
+        const extractedData = await extractReceiptData({photoDataUri});
+
+        // 2. Upload image to Firebase Storage
+        const mimeType = photo.type || 'image/jpeg';
+        const fileName = `receipts/${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
+        const file = storage.bucket().file(fileName);
+
+        await file.save(buffer, {
+            metadata: {
+                contentType: mimeType,
+            },
+        });
+        
+        // 3. Get public URL for the uploaded file
+        const [publicUrl] = await file.getSignedUrl({
+            action: 'read',
+            expires: '01-01-2500' // Far future expiration date
+        });
+
+        // 4. Save receipt data with image URL to Firestore
+        const newReceipt: Omit<Receipt, 'id'> = {
+            ...extractedData,
+            image: publicUrl,
+            date: new Date().toISOString(),
+            userId: 'anonymous',
+        };
+        
+        await db.collection('receipts').add(newReceipt);
+        
+        revalidatePath('/');
+        return {
+            message: 'Receipt processed and saved successfully!',
+            error: false,
+        };
+
+    } catch (e: any) {
+        console.error("Error processing or saving receipt:", e);
+
+        if (e.code === 5) {
+          return {
+            message: "Firestore database not found. Please go to the Firebase Console to create a Firestore database.",
+            error: true,
+          };
+        }
+        
+        const errorMessage = e.message || String(e);
+        const isPermissionError = errorMessage.includes('permission-denied') || errorMessage.includes('7 PERMISSION_DENIED');
+        
+        if (isPermissionError) {
+           return {
+            message: `Firestore/Storage permission denied. Please grant the 'Cloud Datastore User' and 'Storage Admin' roles to your service account.`,
+            error: true,
+            permissionError: true,
+          };
+        }
+
+        return {
+            message: `Failed to process or save receipt: ${errorMessage}`,
+            error: true,
+        };
+    }
 }
 
 
@@ -174,7 +146,9 @@ export async function getReceiptsAction(): Promise<Receipt[]> {
     if (!db) {
         const message = "Firestore is not initialized. Cannot fetch receipts.";
         console.error(message);
-        throw new Error(message);
+        // During development, this might run before initialization is complete.
+        // Return empty array and let the UI handle it. A hard error can be disruptive.
+        return [];
     }
     try {
         const receiptsSnapshot = await db.collection('receipts')
@@ -204,8 +178,13 @@ export async function getReceiptsAction(): Promise<Receipt[]> {
     } catch (e: any) {
         console.error("Firestore Error in getReceiptsAction:", e);
         
-        if (e.code === 5) {
+        if (e.code === 5) { // NOT_FOUND
             throw new Error("Firestore database not found. Please create a Firestore database in your Firebase project console.");
+        }
+        
+        // This can happen if a composite index is required. Firestore provides a link in the error.
+        if (e.code === 9) { // FAILED_PRECONDITION
+             throw new Error(`Firestore query failed. This usually means a composite index is required. Please check the server logs for a link to create the index. Error: ${e.message}`);
         }
 
         const errorMessage = e.message || String(e);

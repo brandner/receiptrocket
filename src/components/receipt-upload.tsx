@@ -5,16 +5,15 @@ import { useEffect, useState, useRef } from 'react';
 import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 import Image from 'next/image';
-import { UploadCloud, X, FileText, CheckCircle, Camera, RefreshCw, Loader2, Save, AlertCircle } from 'lucide-react';
+import { UploadCloud, X, FileText, CheckCircle, Camera, RefreshCw, Loader2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { processReceiptAction, saveReceiptAction } from '@/app/actions';
+import { processAndSaveReceiptAction } from '@/app/actions';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
-import type { Receipt } from '@/types';
 
 type ReceiptUploadProps = {
   onUploadSuccess: () => void;
@@ -23,7 +22,7 @@ type ReceiptUploadProps = {
 const initialState = {
   message: '',
   error: false,
-  receipt: undefined,
+  permissionError: false,
 };
 
 function SubmitButton({ disabled }: { disabled?: boolean }) {
@@ -33,12 +32,12 @@ function SubmitButton({ disabled }: { disabled?: boolean }) {
       {pending ? (
         <>
           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          Extracting...
+          Processing...
         </>
       ) : (
         <>
           <FileText className="mr-2 h-4 w-4" />
-          Extract Data
+          Process & Save
         </>
       )}
     </Button>
@@ -46,7 +45,7 @@ function SubmitButton({ disabled }: { disabled?: boolean }) {
 }
 
 export default function ReceiptUpload({ onUploadSuccess }: ReceiptUploadProps) {
-  const [state, formAction] = useActionState(processReceiptAction, initialState);
+  const [state, formAction] = useActionState(processAndSaveReceiptAction, initialState);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -56,9 +55,6 @@ export default function ReceiptUpload({ onUploadSuccess }: ReceiptUploadProps) {
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const { toast } = useToast();
   const formRef = useRef<HTMLFormElement>(null);
-  const [isSaving, setIsSaving] = useState(false);
-  const [permissionError, setPermissionError] = useState(false);
-
 
   useEffect(() => {
     return () => {
@@ -96,58 +92,37 @@ export default function ReceiptUpload({ onUploadSuccess }: ReceiptUploadProps) {
   }, [uploadMode, hasCameraPermission, toast, cameraStream]);
 
   const resetForm = () => {
-    handleRemoveImage();
-    if (formRef.current) {
-      formRef.current.reset();
+    setImagePreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
+    if (formRef.current) {
+        formRef.current.reset();
+    }
+    // Also reset the state in useActionState
+    // A bit of a hack, but necessary to clear the form state for the next submission
+    (formRef.current?.requestSubmit as any)?.(); 
   }
 
   useEffect(() => {
-    if (state.message && !state.error && state.receipt) {
-      toast({
-        title: 'Success!',
-        description: 'Receipt data extracted. Now saving...',
-        action: <CheckCircle className="text-green-500" />,
-      });
-      
-      const save = async () => {
-        setIsSaving(true);
-        setPermissionError(false);
-        const newReceipt: Omit<Receipt, 'id'> = {
-            ...state.receipt!,
-            date: new Date().toISOString(),
-            userId: 'anonymous'
-        };
-        const saveResult = await saveReceiptAction(newReceipt);
-        setIsSaving(false);
-
-        if (saveResult.error) {
-          if (saveResult.permissionError) {
-            setPermissionError(true);
-          }
-           toast({
-            variant: 'destructive',
-            title: 'Error Saving Receipt',
-            description: saveResult.message,
-          });
+    // This effect runs when the server action completes
+    if (state.message) {
+        if (state.error) {
+            toast({
+                variant: 'destructive',
+                title: state.permissionError ? 'Action Required' : 'Error',
+                description: state.message,
+                duration: state.permissionError ? 20000 : 5000,
+            });
         } else {
-           toast({
-            title: 'Receipt Saved!',
-            description: 'The receipt was successfully saved.',
-            action: <Save className="text-blue-500" />,
-          });
-          onUploadSuccess(); // Trigger data refresh
-          resetForm(); // Reset form on successful save
+            toast({
+                title: 'Success!',
+                description: state.message,
+                action: <CheckCircle className="text-green-500" />,
+            });
+            onUploadSuccess();
+            resetForm();
         }
-      };
-
-      save();
-    } else if (state.message && state.error) {
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: state.message,
-      });
     }
   }, [state, onUploadSuccess, toast]);
 
@@ -185,42 +160,40 @@ export default function ReceiptUpload({ onUploadSuccess }: ReceiptUploadProps) {
   };
 
   const customFormAction = (formData: FormData) => {
-    if (imagePreview) {
-      // If we have an image preview, we create a File object to pass to the action.
-      // This is necessary for both camera and file upload, to have a consistent object.
-      fetch(imagePreview)
-        .then(res => res.blob())
-        .then(blob => {
-          const file = new File([blob], 'receipt.jpg', { type: blob.type || 'image/jpeg' });
-          formData.set('photo', file);
-          formAction(formData);
-        });
-    } else if (fileInputRef.current?.files?.[0]) {
-      // Fallback for file upload if preview is not ready for some reason
-      formData.set('photo', fileInputRef.current.files[0]);
-      formAction(formData);
-    } else {
-      toast({ variant: 'destructive', title: 'No Image', description: 'Please select or capture an image.' });
+    if (!imagePreview) {
+        if (fileInputRef.current?.files?.[0]) {
+             // Fallback for file upload if preview is not ready for some reason
+            formData.set('photo', fileInputRef.current.files[0]);
+            formAction(formData);
+        } else {
+            toast({ variant: 'destructive', title: 'No Image', description: 'Please select or capture an image.' });
+        }
+        return;
     }
+
+    // If we have an image preview, we create a File object to pass to the action.
+    // This is necessary for both camera and file upload, to have a consistent object.
+    fetch(imagePreview)
+      .then(res => res.blob())
+      .then(blob => {
+        const file = new File([blob], 'receipt.jpg', { type: blob.type || 'image/jpeg' });
+        formData.set('photo', file);
+        formAction(formData);
+      });
   };
   
   return (
     <div>
       <h2 className="text-2xl font-bold mb-4 text-center">Upload New Receipt</h2>
 
-      {permissionError && (
+      {state.error && state.permissionError && (
         <Alert variant="destructive" className="mb-4">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Action Required: Permission Denied</AlertTitle>
           <AlertDescription>
-            The application's service account needs permission to save data.
-            <ol className="list-decimal pl-5 mt-2 space-y-1">
-              <li>Go to the <a href={`https://console.cloud.google.com/iam-admin/iam?project=${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}`} target="_blank" rel="noopener noreferrer" className="font-semibold underline">Google Cloud IAM page</a> for your project.</li>
-              <li>Find the principal with the email: <br/><code className="text-xs bg-destructive-foreground/20 p-1 rounded">{process.env.NEXT_PUBLIC_FIREBASE_CLIENT_EMAIL}</code></li>
-              <li>Click the pencil icon to edit its roles.</li>
-              <li>Add the **Cloud Datastore User** and **Storage Admin** roles.</li>
-              <li>Click **Save**. The changes may take a minute to apply.</li>
-            </ol>
+            {state.message}
+            <br/>
+            You can fix this by visiting the <a href={`https://console.cloud.google.com/iam-admin/iam?project=${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}`} target="_blank" rel="noopener noreferrer" className="font-semibold underline">Google Cloud IAM page</a>, finding the principal with email <code className="text-xs bg-destructive-foreground/20 p-1 rounded">{process.env.NEXT_PUBLIC_FIREBASE_CLIENT_EMAIL}</code>, and adding the **Cloud Datastore User** and **Storage Admin** roles.
           </AlertDescription>
         </Alert>
       )}
@@ -324,7 +297,7 @@ export default function ReceiptUpload({ onUploadSuccess }: ReceiptUploadProps) {
         </Tabs>
 
         <div className="flex justify-center">
-          <SubmitButton disabled={!imagePreview || isSaving} />
+          <SubmitButton disabled={!imagePreview} />
         </div>
       </form>
     </div>
