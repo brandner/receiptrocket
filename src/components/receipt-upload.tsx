@@ -14,14 +14,16 @@ import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
+import type { Receipt } from '@/types';
 
 type ReceiptUploadProps = {
-  onReceiptProcessed: () => void;
+  onReceiptProcessed: (receipt: Omit<Receipt, 'id' | 'date'>) => void;
 };
 
 const initialState = {
   message: '',
   error: false,
+  receipt: undefined,
 };
 
 function SubmitButton({ disabled }: { disabled?: boolean }) {
@@ -98,15 +100,14 @@ export default function ReceiptUpload({ onReceiptProcessed }: ReceiptUploadProps
           title: 'Error',
           description: state.message,
         });
-      } else {
+      } else if (state.receipt) {
         toast({
           title: 'Success!',
-          description: 'Receipt data extracted and saved.',
+          description: 'Receipt data extracted.',
           action: <CheckCircle className="text-green-500" />,
         });
-        onReceiptProcessed();
+        onReceiptProcessed(state.receipt);
         handleRemoveImage();
-        // Reset the form state
         if (formRef.current) {
           formRef.current.reset();
         }

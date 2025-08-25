@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { Eye, ReceiptText, FileDown, Trash2, Loader2 } from 'lucide-react';
+import { Eye, ReceiptText, FileDown, Trash2 } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -36,10 +36,9 @@ import type { Receipt } from '@/types';
 type ReceiptListProps = {
   receipts: Receipt[];
   onDeleteReceipt: (id: string) => void;
-  isDeleting?: boolean;
 };
 
-export default function ReceiptList({ receipts, onDeleteReceipt, isDeleting }: ReceiptListProps) {
+export default function ReceiptList({ receipts, onDeleteReceipt }: ReceiptListProps) {
   const formatCurrency = (amount: string | null) => {
     if (amount === null) return 'N/A';
     const number = parseFloat(amount.replace(/[^0-9.-]+/g, ""));
@@ -126,7 +125,7 @@ export default function ReceiptList({ receipts, onDeleteReceipt, isDeleting }: R
             </TableHeader>
             <TableBody>
               {receipts.map(receipt => (
-                <TableRow key={receipt.id} className={isDeleting ? 'opacity-50' : ''}>
+                <TableRow key={receipt.id}>
                   <TableCell className="font-medium">{receipt.companyName}</TableCell>
                   <TableCell className="hidden sm:table-cell text-muted-foreground">{receipt.description}</TableCell>
                   <TableCell className="hidden sm:table-cell text-muted-foreground">{formatDate(receipt.date)}</TableCell>

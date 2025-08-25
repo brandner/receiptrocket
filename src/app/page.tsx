@@ -1,64 +1,34 @@
 'use client';
 
-import { useState, useEffect, useCallback, useTransition } from 'react';
+import { useState, useCallback, useId } from 'react';
 import type { Receipt } from '@/types';
 import ReceiptUpload from '@/components/receipt-upload';
 import ReceiptList from '@/components/receipt-list';
 import Logo from '@/components/logo';
 import { Card, CardContent } from '@/components/ui/card';
-import { getReceiptsAction, deleteReceiptAction } from '@/app/actions';
-import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useToast } from '@/hooks/use-toast';
 
 export default function Home() {
   const [receipts, setReceipts] = useState<Receipt[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
-  const [isDeleting, startDeleteTransition] = useTransition();
+  const uniqueId = useId();
 
-  const loadReceipts = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const fetchedReceipts = await getReceiptsAction();
-      setReceipts(fetchedReceipts);
-    } catch (error) {
-      console.error(error);
-      toast({
-        variant: 'destructive',
-        title: 'Failed to load receipts',
-        description: error instanceof Error ? error.message : String(error),
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [toast]);
-
-  useEffect(() => {
-    loadReceipts();
-  }, [loadReceipts]);
-  
-  const handleReceiptProcessed = () => {
-    // After a receipt is successfully processed and saved, reload the list
-    loadReceipts();
-  };
+  const handleReceiptProcessed = useCallback((newReceiptData: Omit<Receipt, 'id' | 'date'>) => {
+    const newReceipt: Receipt = {
+      ...newReceiptData,
+      id: `receipt-${uniqueId}-${Date.now()}`,
+      date: new Date().toISOString(),
+      userId: 'anonymous' // Placeholder for now
+    };
+    setReceipts(prevReceipts => [newReceipt, ...prevReceipts]);
+  }, [uniqueId]);
 
   const handleDeleteReceipt = useCallback((id: string) => {
-    startDeleteTransition(async () => {
-      const result = await deleteReceiptAction(id);
-      if (result.success) {
-        toast({
-          title: 'Receipt Deleted',
-          description: 'The receipt has been removed.',
-        });
-        // Optimistically update UI or reload
-        setReceipts(prev => prev.filter(receipt => receipt.id !== id));
-      } else {
-        toast({
-          variant: 'destructive',
-          title: 'Error',
-          description: result.message,
-        });
-      }
+    setReceipts(prev => prev.filter(receipt => receipt.id !== id));
+    toast({
+      title: 'Receipt Deleted',
+      description: 'The receipt has been removed.',
     });
   }, [toast]);
   
@@ -85,19 +55,10 @@ export default function Home() {
           </CardContent>
         </Card>
         
-        {isLoading ? (
-          <div className="space-y-4">
-            <Skeleton className="h-24 w-full" />
-            <Skeleton className="h-12 w-full" />
-            <Skeleton className="h-12 w-full" />
-          </div>
-        ) : (
-          <ReceiptList 
-            receipts={receipts} 
-            onDeleteReceipt={handleDeleteReceipt}
-            isDeleting={isDeleting}
-          />
-        )}
+        <ReceiptList 
+          receipts={receipts} 
+          onDeleteReceipt={handleDeleteReceipt}
+        />
       </main>
       
       <footer className="mt-12 text-center text-muted-foreground text-sm">
