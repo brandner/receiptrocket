@@ -4,7 +4,7 @@
 import {extractReceiptData} from '@/ai/flows/extract-receipt-data';
 import type {Receipt} from '@/types';
 import * as admin from 'firebase-admin';
-import {getApps, applicationDefault} from 'firebase-admin/app';
+import {getApps, applicationDefault, getApp} from 'firebase-admin/app';
 import {getFirestore} from 'firebase-admin/firestore';
 
 const ANONYMOUS_USER_ID = 'anonymous';
@@ -16,11 +16,13 @@ const getDb = (() => {
   return () => {
     if (!db) {
       if (getApps().length === 0) {
-        admin.initializeApp({
+        const app = admin.initializeApp({
           credential: applicationDefault(),
         });
+        db = getFirestore(app);
+      } else {
+        db = getFirestore(getApp());
       }
-      db = getFirestore();
     }
     return db;
   };
