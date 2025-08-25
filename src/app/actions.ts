@@ -117,6 +117,14 @@ export async function processAndSaveReceiptAction(
     } catch (e: any) {
         console.error("Error processing or saving receipt:", e);
 
+        if (e.message?.includes('does not exist')) {
+            const bucketName = process.env.FIREBASE_STORAGE_BUCKET;
+             return {
+                message: `Failed to process or save receipt: The specified bucket '${bucketName}' does not exist. Please check your Firebase Storage setup and environment configuration.`,
+                error: true,
+             }
+        }
+
         if (e.code === 5) {
           return {
             message: "Firestore database not found. Please go to the Firebase Console to create a Firestore database.",

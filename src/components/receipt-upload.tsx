@@ -101,10 +101,6 @@ export default function ReceiptUpload({ onUploadSuccess }: ReceiptUploadProps) {
     if (formRef.current) {
         formRef.current.reset();
     }
-    // A bit of a hack to reset the action state.
-    // We can't directly reset it, but submitting an empty form will clear the previous message.
-    const emptyFormData = new FormData();
-    formAction(emptyFormData);
   }
 
   useEffect(() => {
@@ -114,7 +110,7 @@ export default function ReceiptUpload({ onUploadSuccess }: ReceiptUploadProps) {
                 variant: 'destructive',
                 title: state.permissionError ? 'Action Required' : 'Error',
                 description: state.message,
-                duration: state.permissionError ? 20000 : 5000,
+                duration: state.permissionError ? 20000 : 9000,
             });
         } else {
             toast({
@@ -159,7 +155,6 @@ export default function ReceiptUpload({ onUploadSuccess }: ReceiptUploadProps) {
         context.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
         const dataUri = canvas.toDataURL('image/jpeg');
         setImagePreview(dataUri);
-        // Convert data URI to File and set it
         fetch(dataUri)
           .then(res => res.blob())
           .then(blob => {
@@ -170,19 +165,17 @@ export default function ReceiptUpload({ onUploadSuccess }: ReceiptUploadProps) {
     }
   };
 
-  // This function ensures the correct file is in the form right before submission
   const onFormSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
-    if (selectedFile) {
-        formData.set('photo', selectedFile);
-    } else if (fileInputRef.current?.files?.[0]) {
-        // Fallback for file input if state hasn't updated
-        formData.set('photo', fileInputRef.current.files[0]);
-    } else {
-        toast({ variant: 'destructive', title: 'No Image', description: 'Please select or capture an image.' });
-        return;
+    
+    // If a file was selected via camera, it's in `selectedFile` state.
+    // The regular file input is handled automatically by FormData.
+    // We only need to append if the camera was used and the file input is empty.
+    if (selectedFile && !formData.get('photo')) {
+      formData.set('photo', selectedFile);
     }
+
     formAction(formData);
   };
   
@@ -202,7 +195,7 @@ export default function ReceiptUpload({ onUploadSuccess }: ReceiptUploadProps) {
         </Alert>
       )}
 
-      <form ref={formRef} onSubmit={onFormSubmit} className="space-y-6">
+      <form ref={formRef} action={formAction} className="space-y-6">
         <Tabs value={uploadMode} onValueChange={(value) => setUploadMode(value as any)} className="w-full mb-4">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="upload"><UploadCloud className="mr-2 h-4 w-4" /> File Upload</TabsTrigger>
@@ -293,7 +286,7 @@ export default function ReceiptUpload({ onUploadSuccess }: ReceiptUploadProps) {
                   </>
                 )}
               </div>
-              {hasCameraPermission && !imagePreview && (
+              {cameraStream && !imagePreview && (
                   <Button type="button" onClick={handleTakePhoto} className="w-full">
                       <Camera className="mr-2 h-4 w-4" />
                       Take Photo
@@ -302,6 +295,21 @@ export default function ReceiptUpload({ onUploadSuccess }: ReceiptUploadProps) {
               </div>
           </TabsContent>
         </Tabs>
+        
+        {/* Hidden input to carry the camera file */}
+        <input 
+          type="file" 
+          name="photo" 
+          ref={el => {
+            if (el && selectedFile) {
+              const dataTransfer = new DataTransfer();
+              dataTransfer.items.add(selectedFile);
+              el.files = dataTransfer.files;
+            }
+          }}
+          className="hidden" 
+          readOnly
+        />
 
         <div className="flex justify-center">
           <SubmitButton disabled={!imagePreview && !selectedFile} />
