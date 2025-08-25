@@ -1,4 +1,3 @@
-
 'use server';
 
 import {extractReceiptData} from '@/ai/flows/extract-receipt-data';
@@ -92,17 +91,31 @@ export async function getReceiptsAction(): Promise<Receipt[]> {
                                  .get();
 
         if (snapshot.empty) {
+            console.log("No matching documents.");
             return [];
         }
 
-        return snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...(doc.data() as Omit<Receipt, 'id'>)
-        }));
+        const receipts: Receipt[] = [];
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            // Safer mapping to avoid issues with spread operator on complex proxy objects
+            receipts.push({
+                id: doc.id,
+                companyName: data.companyName,
+                description: data.description,
+                gst: data.gst,
+                pst: data.pst,
+                totalAmount: data.totalAmount,
+                image: data.image,
+                date: data.date,
+                userId: data.userId,
+            });
+        });
+        return receipts;
+
     } catch (e) {
-        console.error(e);
-        const errorMessage = e instanceof Error ? e.message : 'An unknown error occurred.';
-        // In a real app, you might want a more sophisticated error handling/logging mechanism
+        console.error("Firestore Error in getReceiptsAction:", e);
+        const errorMessage = e instanceof Error ? e.message : String(e);
         throw new Error(`Failed to retrieve receipts: ${errorMessage}`);
     }
 }
