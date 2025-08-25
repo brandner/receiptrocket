@@ -20,8 +20,8 @@ const initializeFirebaseAdmin = () => {
     return;
   }
 
-  if (!process.env.FIREBASE_PROJECT_ID || !process.env.FIREBASE_CLIENT_EMAIL || !process.env.FIREBASE_PRIVATE_KEY) {
-    console.warn("Firebase Admin credentials not set. Skipping initialization.");
+  if (!process.env.FIREBASE_PROJECT_ID || !process.env.FIREBASE_CLIENT_EMAIL || !process.env.FIREBASE_PRIVATE_KEY || !process.env.FIREBASE_STORAGE_BUCKET) {
+    console.warn("Firebase Admin credentials or Storage Bucket not set. Skipping initialization.");
     return;
   }
 
@@ -36,7 +36,7 @@ const initializeFirebaseAdmin = () => {
   try {
     const app = admin.initializeApp({
       credential: admin.credential.cert(credentials),
-      storageBucket: `receiptrocket-h9b5k.appspot.com`,
+      storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
     });
     db = getFirestore(app);
     storage = getStorage(app);
