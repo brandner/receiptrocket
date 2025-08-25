@@ -1,3 +1,4 @@
+
 'use server';
 
 import {extractReceiptData} from '@/ai/flows/extract-receipt-data';
@@ -8,26 +9,20 @@ import { getFirestore } from 'firebase-admin/firestore';
 const ANONYMOUS_USER_ID = 'anonymous';
 
 // Helper to initialize the Admin SDK and get the Firestore instance.
-// This is memoized to ensure it's only called once.
-const getDb = (() => {
-  let db: admin.firestore.Firestore | null = null;
-  return () => {
-    if (!db) {
-        if (admin.apps.length === 0) {
-            const privateKey = process.env.FIREBASE_PRIVATE_KEY!.replace(/\\n/g, '\n');
-            admin.initializeApp({
-                credential: admin.credential.cert({
-                    projectId: process.env.FIREBASE_PROJECT_ID,
-                    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-                    privateKey,
-                }),
-            });
-        }
-        db = getFirestore();
+// This is a simplified and robust way to ensure it's initialized only once.
+const getDb = () => {
+    if (admin.apps.length === 0) {
+        const privateKey = process.env.FIREBASE_PRIVATE_KEY!.replace(/\\n/g, '\n');
+        admin.initializeApp({
+            credential: admin.credential.cert({
+                projectId: process.env.FIREBASE_PROJECT_ID,
+                clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+                privateKey,
+            }),
+        });
     }
-    return db;
-  };
-})();
+    return getFirestore();
+};
 
 
 type ProcessFormState = {
