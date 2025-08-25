@@ -27,8 +27,15 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Store the original fetch function
+const originalFetch = globalThis.fetch;
+
 async function getAuthenticatedAppForUser(user: User | null) {
   if (!user) {
+    // If user is logged out, restore the original fetch
+    if (globalThis.fetch !== originalFetch) {
+       globalThis.fetch = originalFetch;
+    }
     return null;
   }
   const idToken = await user.getIdToken();
@@ -41,13 +48,12 @@ async function getAuthenticatedAppForUser(user: User | null) {
     const headers = new Headers(init?.headers);
     headers.set('Authorization', `Bearer ${idToken}`);
     const newInit: RequestInit = { ...init, headers };
-    return fetch(input, newInit);
+    // Call the original fetch, not the monkey-patched one
+    return originalFetch(input, newInit);
   };
   
   // Monkey-patch the global fetch
-  // This is a temporary solution for this context
-  (globalThis as any)._originalFetch = globalThis.fetch;
-  (globalThis as any).fetch = customFetch;
+  globalThis.fetch = customFetch;
 
   return { user };
 }
@@ -67,8 +73,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       unsubscribe();
       // Restore original fetch on cleanup
-      if ((globalThis as any)._originalFetch) {
-        globalThis.fetch = (globalThis as any)._originalFetch;
+      if (globalThis.fetch !== originalFetch) {
+        globalThis.fetch = originalFetch;
       }
     }
   }, []);
