@@ -5,11 +5,11 @@ import { useEffect, useState, useRef } from 'react';
 import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 import Image from 'next/image';
-import { UploadCloud, X, FileText, CheckCircle, Camera, RefreshCw, Loader2 } from 'lucide-react';
+import { UploadCloud, X, FileText, CheckCircle, Camera, RefreshCw, Loader2, Save } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { processReceiptAction } from '@/app/actions';
+import { processReceiptAction, saveReceiptAction } from '@/app/actions';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -56,6 +56,7 @@ export default function ReceiptUpload({ onReceiptProcessed }: ReceiptUploadProps
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const { toast } = useToast();
   const formRef = useRef<HTMLFormElement>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     return () => {
@@ -103,10 +104,42 @@ export default function ReceiptUpload({ onReceiptProcessed }: ReceiptUploadProps
       } else if (state.receipt) {
         toast({
           title: 'Success!',
-          description: 'Receipt data extracted.',
+          description: 'Receipt data extracted. Now saving...',
           action: <CheckCircle className="text-green-500" />,
         });
+        
+        // Pass to parent to display in the list (temporary)
         onReceiptProcessed(state.receipt);
+
+        // Now, save to firestore
+        const save = async () => {
+          setIsSaving(true);
+          const newReceipt: Omit<Receipt, 'id'> = {
+              ...state.receipt!,
+              date: new Date().toISOString(),
+              userId: 'anonymous'
+          };
+          const saveResult = await saveReceiptAction(newReceipt);
+          setIsSaving(false);
+
+          if (saveResult.error) {
+             toast({
+              variant: 'destructive',
+              title: 'Error Saving Receipt',
+              description: saveResult.message,
+            });
+          } else {
+             toast({
+              title: 'Receipt Saved!',
+              description: 'The receipt has been saved to the database.',
+              action: <Save className="text-blue-500" />,
+            });
+          }
+        };
+
+        save();
+
+        // Reset form
         handleRemoveImage();
         if (formRef.current) {
           formRef.current.reset();
@@ -264,7 +297,7 @@ export default function ReceiptUpload({ onReceiptProcessed }: ReceiptUploadProps
         </Tabs>
 
         <div className="flex justify-center">
-          <SubmitButton disabled={!imagePreview} />
+          <SubmitButton disabled={!imagePreview || isSaving} />
         </div>
       </form>
     </div>
