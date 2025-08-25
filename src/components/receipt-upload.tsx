@@ -47,6 +47,7 @@ function SubmitButton({ disabled }: { disabled?: boolean }) {
 export default function ReceiptUpload({ onUploadSuccess }: ReceiptUploadProps) {
   const [state, formAction] = useActionState(processAndSaveReceiptAction, initialState);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -93,19 +94,20 @@ export default function ReceiptUpload({ onUploadSuccess }: ReceiptUploadProps) {
 
   const resetForm = () => {
     setImagePreview(null);
+    setSelectedFile(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
     if (formRef.current) {
         formRef.current.reset();
     }
-    // Also reset the state in useActionState
-    // A bit of a hack, but necessary to clear the form state for the next submission
-    (formRef.current?.requestSubmit as any)?.(); 
+    // A bit of a hack to reset the action state.
+    // We can't directly reset it, but submitting an empty form will clear the previous message.
+    const emptyFormData = new FormData();
+    formAction(emptyFormData);
   }
 
   useEffect(() => {
-    // This effect runs when the server action completes
     if (state.message) {
         if (state.error) {
             toast({
@@ -129,6 +131,7 @@ export default function ReceiptUpload({ onUploadSuccess }: ReceiptUploadProps) {
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
+      setSelectedFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
         setImagePreview(reader.result as string);
@@ -139,6 +142,7 @@ export default function ReceiptUpload({ onUploadSuccess }: ReceiptUploadProps) {
 
   const handleRemoveImage = () => {
     setImagePreview(null);
+    setSelectedFile(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -155,31 +159,31 @@ export default function ReceiptUpload({ onUploadSuccess }: ReceiptUploadProps) {
         context.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
         const dataUri = canvas.toDataURL('image/jpeg');
         setImagePreview(dataUri);
+        // Convert data URI to File and set it
+        fetch(dataUri)
+          .then(res => res.blob())
+          .then(blob => {
+            const file = new File([blob], 'receipt.jpg', { type: 'image/jpeg' });
+            setSelectedFile(file);
+          });
       }
     }
   };
 
-  const customFormAction = (formData: FormData) => {
-    if (!imagePreview) {
-        if (fileInputRef.current?.files?.[0]) {
-             // Fallback for file upload if preview is not ready for some reason
-            formData.set('photo', fileInputRef.current.files[0]);
-            formAction(formData);
-        } else {
-            toast({ variant: 'destructive', title: 'No Image', description: 'Please select or capture an image.' });
-        }
+  // This function ensures the correct file is in the form right before submission
+  const onFormSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    if (selectedFile) {
+        formData.set('photo', selectedFile);
+    } else if (fileInputRef.current?.files?.[0]) {
+        // Fallback for file input if state hasn't updated
+        formData.set('photo', fileInputRef.current.files[0]);
+    } else {
+        toast({ variant: 'destructive', title: 'No Image', description: 'Please select or capture an image.' });
         return;
     }
-
-    // If we have an image preview, we create a File object to pass to the action.
-    // This is necessary for both camera and file upload, to have a consistent object.
-    fetch(imagePreview)
-      .then(res => res.blob())
-      .then(blob => {
-        const file = new File([blob], 'receipt.jpg', { type: blob.type || 'image/jpeg' });
-        formData.set('photo', file);
-        formAction(formData);
-      });
+    formAction(formData);
   };
   
   return (
@@ -198,7 +202,7 @@ export default function ReceiptUpload({ onUploadSuccess }: ReceiptUploadProps) {
         </Alert>
       )}
 
-      <form ref={formRef} action={customFormAction} className="space-y-6">
+      <form ref={formRef} onSubmit={onFormSubmit} className="space-y-6">
         <Tabs value={uploadMode} onValueChange={(value) => setUploadMode(value as any)} className="w-full mb-4">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="upload"><UploadCloud className="mr-2 h-4 w-4" /> File Upload</TabsTrigger>
@@ -260,7 +264,10 @@ export default function ReceiptUpload({ onUploadSuccess }: ReceiptUploadProps) {
                       variant="destructive"
                       size="icon"
                       className="absolute top-2 right-2 z-10 h-8 w-8 rounded-full"
-                      onClick={() => setImagePreview(null)}
+                      onClick={() => {
+                        setImagePreview(null);
+                        setSelectedFile(null);
+                      }}
                     >
                       <RefreshCw className="h-4 w-4" />
                       <span className="sr-only">Retake photo</span>
@@ -297,7 +304,7 @@ export default function ReceiptUpload({ onUploadSuccess }: ReceiptUploadProps) {
         </Tabs>
 
         <div className="flex justify-center">
-          <SubmitButton disabled={!imagePreview} />
+          <SubmitButton disabled={!imagePreview && !selectedFile} />
         </div>
       </form>
     </div>
