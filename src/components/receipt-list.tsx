@@ -140,40 +140,42 @@ export default function ReceiptList({ receipts, onDeleteReceipt }: ReceiptListPr
                   <TableCell className="text-right font-mono">{formatCurrency(receipt.totalAmount)}</TableCell>
                   <TableCell className="text-right">
                      <div className="flex items-center justify-end gap-2">
-                        <Dialog>
-                          <DialogTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <Eye className="h-4 w-4" />
-                              <span className="sr-only">View Receipt</span>
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent className="sm:max-w-2xl">
-                            <DialogHeader>
-                              <DialogTitle>{receipt.companyName}</DialogTitle>
-                            </DialogHeader>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
-                              <div className="relative w-full h-96 rounded-lg overflow-hidden border">
-                                  <Image
-                                    src={receipt.image}
-                                    alt={`Receipt from ${receipt.companyName}`}
-                                    layout="fill"
-                                    objectFit="contain"
-                                    data-ai-hint="receipt document"
-                                  />
-                              </div>
-                              <div className="space-y-4">
-                                <h3 className="text-lg font-semibold">Extracted Details</h3>
-                                <div className="space-y-2 text-sm">
-                                   <div className="flex justify-between"><span>Company:</span> <span className="font-medium">{receipt.companyName}</span></div>
-                                   <div className="flex justify-between"><span>Description:</span> <span className="font-medium">{receipt.description}</span></div>
-                                   <div className="flex justify-between"><span>GST/HST:</span> <Badge variant="secondary">{formatCurrency(receipt.gst)}</Badge></div>
-                                   <div className="flex justify-between"><span>PST:</span> <Badge variant="secondary">{formatCurrency(receipt.pst)}</Badge></div>
-                                   <div className="flex justify-between text-base font-bold pt-2 border-t mt-2"><span>Total:</span> <span>{formatCurrency(receipt.totalAmount)}</span></div>
+                        {receipt.image && (
+                          <Dialog>
+                            <DialogTrigger asChild>
+                              <Button variant="ghost" size="icon">
+                                <Eye className="h-4 w-4" />
+                                <span className="sr-only">View Receipt</span>
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent className="sm:max-w-2xl">
+                              <DialogHeader>
+                                <DialogTitle>{receipt.companyName}</DialogTitle>
+                              </DialogHeader>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
+                                <div className="relative w-full h-96 rounded-lg overflow-hidden border">
+                                    <Image
+                                      src={receipt.image}
+                                      alt={`Receipt from ${receipt.companyName}`}
+                                      layout="fill"
+                                      objectFit="contain"
+                                      data-ai-hint="receipt document"
+                                    />
+                                </div>
+                                <div className="space-y-4">
+                                  <h3 className="text-lg font-semibold">Extracted Details</h3>
+                                  <div className="space-y-2 text-sm">
+                                     <div className="flex justify-between"><span>Company:</span> <span className="font-medium">{receipt.companyName}</span></div>
+                                     <div className="flex justify-between"><span>Description:</span> <span className="font-medium">{receipt.description}</span></div>
+                                     <div className="flex justify-between"><span>GST/HST:</span> <Badge variant="secondary">{formatCurrency(receipt.gst)}</Badge></div>
+                                     <div className="flex justify-between"><span>PST:</span> <Badge variant="secondary">{formatCurrency(receipt.pst)}</Badge></div>
+                                     <div className="flex justify-between text-base font-bold pt-2 border-t mt-2"><span>Total:</span> <span>{formatCurrency(receipt.totalAmount)}</span></div>
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          </DialogContent>
-                        </Dialog>
+                            </DialogContent>
+                          </Dialog>
+                        )}
 
                         <AlertDialog>
                           <AlertDialogTrigger asChild>

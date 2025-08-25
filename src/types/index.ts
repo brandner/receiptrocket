@@ -1,3 +1,4 @@
+
 export type ReceiptData = {
   companyName: string;
   description: string;
@@ -8,7 +9,7 @@ export type ReceiptData = {
 
 export type Receipt = {
   id: string;
-  image: string; // data URI
+  image?: string; // data URI - now optional
   date: string; // ISO string
   userId: string;
 } & ReceiptData;

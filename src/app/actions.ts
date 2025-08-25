@@ -103,8 +103,10 @@ export async function saveReceiptAction(receiptData: Omit<Receipt, 'id'>): Promi
   }
 
   try {
-    const newReceipt: Omit<Receipt, 'id'> = {
-      ...receiptData,
+    const { image, ...receiptToSave } = receiptData;
+
+    const newReceipt: Omit<Receipt, 'id' | 'image'> = {
+      ...receiptToSave,
     };
     
     await db.collection('receipts').add(newReceipt);
@@ -116,8 +118,15 @@ export async function saveReceiptAction(receiptData: Omit<Receipt, 'id'>): Promi
 
   } catch (e: any) {
     console.error("Error saving to Firestore:", e);
-    const errorMessage = e.message || String(e);
     
+    if (e.code === 5) {
+      return {
+        message: "Firestore database not found. Please go to the Firebase Console to create a Firestore database.",
+        error: true,
+      };
+    }
+
+    const errorMessage = e.message || String(e);
     const isPermissionError = errorMessage.includes('permission-denied') || errorMessage.includes('7 PERMISSION_DENIED');
     
     if (isPermissionError) {
@@ -162,15 +171,19 @@ export async function getReceiptsAction(): Promise<Receipt[]> {
                 gst: data.gst || null,
                 pst: data.pst || null,
                 date: data.date,
-                image: data.image,
+                image: data.image || null, // Image may not be present
                 userId: data.userId,
             };
         });
         return receipts;
     } catch (e: any) {
         console.error("Firestore Error in getReceiptsAction:", e);
-        const errorMessage = e.message || String(e);
+        
+        if (e.code === 5) { // NOT_FOUND
+            throw new Error("Firestore database not found. Please create a Firestore database in your Firebase project console.");
+        }
 
+        const errorMessage = e.message || String(e);
         throw new Error(`Failed to retrieve receipts: ${errorMessage}`);
     }
 }
