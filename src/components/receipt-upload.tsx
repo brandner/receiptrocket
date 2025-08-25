@@ -136,8 +136,8 @@ export default function ReceiptUpload({ onReceiptProcessed }: ReceiptUploadProps
             });
           } else {
              toast({
-              title: 'Data Logged!',
-              description: 'Check server console. Saving is disabled until permissions are fixed.',
+              title: 'Receipt Saved!',
+              description: 'The receipt was successfully saved to the database.',
               action: <Save className="text-blue-500" />,
             });
           }

@@ -3,7 +3,7 @@
 
 import {extractReceiptData} from '@/ai/flows/extract-receipt-data';
 import type {Receipt} from '@/types';
-import admin, { type App } from 'firebase-admin';
+import admin, { type App, type ServiceAccount } from 'firebase-admin';
 import type { Firestore } from 'firebase-admin/firestore';
 
 // --- Firebase Admin Initialization ---
@@ -112,13 +112,10 @@ export async function saveReceiptAction(receiptData: Omit<Receipt, 'id'>): Promi
       ...receiptData,
     };
     
-    // Temporarily disabled to avoid permission errors.
-    // await db.collection('receipts').add(newReceipt);
-    console.log("Receipt data to be saved:", JSON.stringify(newReceipt, null, 2));
-
+    await db.collection('receipts').add(newReceipt);
 
     return {
-      message: 'Receipt would be saved here, but the operation is temporarily disabled.',
+      message: 'Receipt saved successfully to Firestore!',
       error: false,
     };
 
