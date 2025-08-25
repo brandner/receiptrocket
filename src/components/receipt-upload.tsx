@@ -133,7 +133,7 @@ export default function ReceiptUpload({ onUploadSuccess }: ReceiptUploadProps) {
         } else {
            toast({
             title: 'Receipt Saved!',
-            description: 'The receipt was successfully saved to the database.',
+            description: 'The receipt was successfully saved.',
             action: <Save className="text-blue-500" />,
           });
           onUploadSuccess(); // Trigger data refresh
@@ -185,16 +185,22 @@ export default function ReceiptUpload({ onUploadSuccess }: ReceiptUploadProps) {
   };
 
   const customFormAction = (formData: FormData) => {
-    if (uploadMode === 'camera' && imagePreview) {
+    if (imagePreview) {
+      // If we have an image preview, we create a File object to pass to the action.
+      // This is necessary for both camera and file upload, to have a consistent object.
       fetch(imagePreview)
         .then(res => res.blob())
         .then(blob => {
-          const file = new File([blob], 'receipt.jpg', { type: 'image/jpeg' });
+          const file = new File([blob], 'receipt.jpg', { type: blob.type || 'image/jpeg' });
           formData.set('photo', file);
           formAction(formData);
         });
-    } else {
+    } else if (fileInputRef.current?.files?.[0]) {
+      // Fallback for file upload if preview is not ready for some reason
+      formData.set('photo', fileInputRef.current.files[0]);
       formAction(formData);
+    } else {
+      toast({ variant: 'destructive', title: 'No Image', description: 'Please select or capture an image.' });
     }
   };
   
@@ -212,7 +218,7 @@ export default function ReceiptUpload({ onUploadSuccess }: ReceiptUploadProps) {
               <li>Go to the <a href={`https://console.cloud.google.com/iam-admin/iam?project=${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}`} target="_blank" rel="noopener noreferrer" className="font-semibold underline">Google Cloud IAM page</a> for your project.</li>
               <li>Find the principal with the email: <br/><code className="text-xs bg-destructive-foreground/20 p-1 rounded">{process.env.NEXT_PUBLIC_FIREBASE_CLIENT_EMAIL}</code></li>
               <li>Click the pencil icon to edit its roles.</li>
-              <li>Add the **Cloud Datastore User** role.</li>
+              <li>Add the **Cloud Datastore User** and **Storage Admin** roles.</li>
               <li>Click **Save**. The changes may take a minute to apply.</li>
             </ol>
           </AlertDescription>

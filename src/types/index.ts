@@ -9,7 +9,7 @@ export type ReceiptData = {
 
 export type Receipt = {
   id: string;
-  image?: string; // data URI - now optional
+  image: string; // public URL for the image in Firebase Storage
   date: string; // ISO string
   userId: string;
 } & ReceiptData;

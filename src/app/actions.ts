@@ -5,14 +5,18 @@ import {extractReceiptData} from '@/ai/flows/extract-receipt-data';
 import type {Receipt} from '@/types';
 import admin, { type App, type ServiceAccount } from 'firebase-admin';
 import { getFirestore, type Firestore } from 'firebase-admin/firestore';
+import { getStorage, type Storage } from 'firebase-admin/storage';
 import { revalidatePath } from 'next/cache';
 
 // --- Firebase Admin Initialization ---
 let db: Firestore;
+let storage: Storage;
 
 const initializeFirebaseAdmin = () => {
   if (admin.apps.length > 0) {
-    db = getFirestore(admin.app());
+    const app = admin.app();
+    db = getFirestore(app);
+    storage = getStorage(app);
     return;
   }
 
@@ -32,8 +36,10 @@ const initializeFirebaseAdmin = () => {
   try {
     const app = admin.initializeApp({
       credential: admin.credential.cert(credentials),
+      storageBucket: `${process.env.FIREBASE_PROJECT_ID}.appspot.com`,
     });
     db = getFirestore(app);
+    storage = getStorage(app);
   } catch (error) {
     console.error("Firebase Admin SDK initialization error:", error);
   }
@@ -70,7 +76,7 @@ export async function processReceiptAction(
 
     const newReceiptData = {
       ...extractedData,
-      image: photoDataUri,
+      image: photoDataUri, // Temporary, will be replaced by URL after upload
     };
 
     return {
@@ -96,17 +102,36 @@ type SaveReceiptState = {
 };
 
 export async function saveReceiptAction(receiptData: Omit<Receipt, 'id'>): Promise<SaveReceiptState> {
-  if (!db) {
-    const message = "Firestore is not initialized. Please check your Firebase Admin credentials.";
+  if (!db || !storage) {
+    const message = "Firestore or Storage is not initialized. Please check your Firebase Admin credentials.";
     console.error(message);
     return { message, error: true };
   }
 
   try {
-    const { image, ...receiptToSave } = receiptData;
+    // 1. Upload image to Firebase Storage
+    const { image: imageDataUri, ...receiptToSave } = receiptData;
+    const buffer = Buffer.from(imageDataUri.split(',')[1], 'base64');
+    const mimeType = imageDataUri.match(/data:(.*);base64/)?.[1] || 'image/jpeg';
+    const fileName = `receipts/${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
+    const file = storage.bucket().file(fileName);
 
-    const newReceipt: Omit<Receipt, 'id' | 'image'> = {
+    await file.save(buffer, {
+      metadata: {
+        contentType: mimeType,
+      },
+    });
+    
+    // Get public URL
+    const [publicUrl] = await file.getSignedUrl({
+        action: 'read',
+        expires: '01-01-2500' // Far future expiration date
+    });
+
+    // 2. Save receipt data with image URL to Firestore
+    const newReceipt: Omit<Receipt, 'id'> = {
       ...receiptToSave,
+      image: publicUrl, // Store the public URL
     };
     
     await db.collection('receipts').add(newReceipt);
@@ -117,7 +142,7 @@ export async function saveReceiptAction(receiptData: Omit<Receipt, 'id'>): Promi
     };
 
   } catch (e: any) {
-    console.error("Error saving to Firestore:", e);
+    console.error("Error saving to Firestore/Storage:", e);
     
     if (e.code === 5) {
       return {
@@ -131,7 +156,7 @@ export async function saveReceiptAction(receiptData: Omit<Receipt, 'id'>): Promi
     
     if (isPermissionError) {
        return {
-        message: `Firestore permission denied. Please grant the 'Cloud Datastore User' role to your service account.`,
+        message: `Firestore/Storage permission denied. Please grant the 'Cloud Datastore User' and 'Storage Admin' roles to your service account.`,
         error: true,
         permissionError: true,
       };
@@ -171,7 +196,7 @@ export async function getReceiptsAction(): Promise<Receipt[]> {
                 gst: data.gst || null,
                 pst: data.pst || null,
                 date: data.date,
-                image: data.image || null, // Image may not be present
+                image: data.image,
                 userId: data.userId,
             };
         });
@@ -179,7 +204,7 @@ export async function getReceiptsAction(): Promise<Receipt[]> {
     } catch (e: any) {
         console.error("Firestore Error in getReceiptsAction:", e);
         
-        if (e.code === 5) { // NOT_FOUND
+        if (e.code === 5) {
             throw new Error("Firestore database not found. Please create a Firestore database in your Firebase project console.");
         }
 
@@ -189,13 +214,39 @@ export async function getReceiptsAction(): Promise<Receipt[]> {
 }
 
 export async function deleteReceiptAction(id: string): Promise<{ success: boolean, message: string }> {
-    if (!db) {
-        const message = "Firestore is not initialized. Cannot delete receipt.";
+    if (!db || !storage) {
+        const message = "Firestore or Storage is not initialized. Cannot delete receipt.";
         console.error(message);
         return { success: false, message };
     }
     try {
-        await db.collection('receipts').doc(id).delete();
+        const receiptRef = db.collection('receipts').doc(id);
+        const receiptDoc = await receiptRef.get();
+
+        if (!receiptDoc.exists) {
+            return { success: false, message: 'Receipt not found.' };
+        }
+
+        // Delete image from Storage
+        const receiptData = receiptDoc.data() as Receipt;
+        if (receiptData.image) {
+            try {
+                const url = new URL(receiptData.image);
+                const pathName = decodeURIComponent(url.pathname);
+                // The actual file path in the bucket is usually after the bucket name and '/o/'
+                const filePath = pathName.substring(pathName.indexOf('/o/') + 3);
+                if (filePath) {
+                    await storage.bucket().file(filePath).delete();
+                }
+            } catch (storageError) {
+                console.error("Error deleting file from Storage, continuing to delete Firestore doc:", storageError);
+                // Don't block Firestore deletion if storage deletion fails
+            }
+        }
+
+        // Delete document from Firestore
+        await receiptRef.delete();
+
         revalidatePath('/');
         return { success: true, message: 'Receipt deleted successfully.' };
     } catch (e: any) {
