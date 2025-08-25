@@ -8,6 +8,8 @@ import { getFirestore, type Firestore } from 'firebase-admin/firestore';
 import { getStorage, type Storage } from 'firebase-admin/storage';
 import { revalidatePath } from 'next/cache';
 import { randomUUID } from 'crypto';
+import { getAuth } from 'firebase-admin/auth';
+import { headers } from 'next/headers';
 
 // --- Firebase Admin Initialization ---
 let db: Firestore;
@@ -47,6 +49,22 @@ const initializeFirebaseAdmin = () => {
 };
 
 initializeFirebaseAdmin();
+
+// Helper to get current user's UID
+async function getUserId(): Promise<string | null> {
+  const authorization = headers().get('Authorization');
+  if (authorization?.startsWith('Bearer ')) {
+    const idToken = authorization.split('Bearer ')[1];
+    try {
+      const decodedToken = await getAuth().verifyIdToken(idToken);
+      return decodedToken.uid;
+    } catch (error) {
+      console.error('Error verifying auth token:', error);
+      return null;
+    }
+  }
+  return null;
+}
 // --- End Firebase Admin Initialization ---
 
 type ProcessAndSaveState = {
@@ -60,6 +78,11 @@ export async function processAndSaveReceiptAction(
   prevState: ProcessAndSaveState,
   formData: FormData
 ): Promise<ProcessAndSaveState> {
+    const userId = await getUserId();
+    if (!userId) {
+        return { message: 'You must be logged in to upload receipts.', error: true };
+    }
+
     const photo = formData.get('photo') as File;
 
     if (!photo || photo.size === 0) {
@@ -104,7 +127,7 @@ export async function processAndSaveReceiptAction(
             ...extractedData,
             image: publicUrl,
             date: new Date().toISOString(),
-            userId: 'anonymous',
+            userId,
         };
         
         await db.collection('receipts').add(newReceipt);
@@ -153,13 +176,18 @@ export async function processAndSaveReceiptAction(
 
 
 export async function getReceiptsAction(): Promise<Receipt[]> {
+    const userId = await getUserId();
+    if (!userId) {
+        return [];
+    }
+
     if (!db) {
         console.error("Firestore is not initialized. Cannot fetch receipts.");
         return [];
     }
     try {
         const receiptsSnapshot = await db.collection('receipts')
-            .where('userId', '==', 'anonymous')
+            .where('userId', '==', userId)
             .orderBy('date', 'desc')
             .get();
 
@@ -200,6 +228,11 @@ export async function getReceiptsAction(): Promise<Receipt[]> {
 }
 
 export async function deleteReceiptAction(id: string): Promise<{ success: boolean, message: string }> {
+    const userId = await getUserId();
+    if (!userId) {
+        return { success: false, message: 'You must be logged in to delete receipts.' };
+    }
+
     if (!db || !storage) {
         const message = "Firestore or Storage is not initialized. Cannot delete receipt.";
         console.error(message);
@@ -212,9 +245,14 @@ export async function deleteReceiptAction(id: string): Promise<{ success: boolea
         if (!receiptDoc.exists) {
             return { success: false, message: 'Receipt not found.' };
         }
+        const receiptData = receiptDoc.data() as Receipt;
+
+        // Security check: ensure the user owns the receipt
+        if (receiptData.userId !== userId) {
+            return { success: false, message: 'You do not have permission to delete this receipt.' };
+        }
 
         // Delete image from Storage
-        const receiptData = receiptDoc.data() as Receipt;
         if (receiptData.image) {
             try {
                 const url = new URL(receiptData.image);

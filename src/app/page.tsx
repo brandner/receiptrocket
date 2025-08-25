@@ -11,15 +11,23 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { getReceiptsAction, deleteReceiptAction } from '@/app/actions';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertCircle, ReceiptText } from 'lucide-react';
+import { AlertCircle, LogIn, ReceiptText } from 'lucide-react';
+import { useAuth } from '@/hooks/use-auth';
+import AuthButton from '@/components/auth-button';
 
 export default function Home() {
   const [receipts, setReceipts] = useState<Receipt[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
+  const { user, loading: authLoading } = useAuth();
 
   const fetchReceipts = useCallback(async () => {
+    if (!user) {
+      setReceipts([]);
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     setError(null);
     try {
@@ -32,11 +40,14 @@ export default function Home() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
-    fetchReceipts();
-  }, [fetchReceipts]);
+    // Fetch receipts only when user object is available (not loading)
+    if (!authLoading) {
+      fetchReceipts();
+    }
+  }, [fetchReceipts, authLoading]);
 
   const handleDeleteReceipt = useCallback(async (id: string) => {
     const originalReceipts = [...receipts];
@@ -47,7 +58,7 @@ export default function Home() {
     if (result.success) {
       toast({
         title: 'Receipt Deleted',
-        description: 'The receipt has been removed from the database.',
+        description: 'The receipt has been removed from your database.',
       });
     } else {
       toast({
@@ -59,15 +70,21 @@ export default function Home() {
     }
   }, [receipts, toast]);
   
+  const showLoginPrompt = !user && !authLoading;
+
   return (
     <div className="flex flex-col items-center min-h-screen bg-background py-8 px-4 sm:px-6 lg:px-8">
-      <header className="flex flex-col items-center text-center mb-8 w-full">
-        <div className="flex justify-center items-center w-full max-w-5xl">
-          <div className="flex flex-col items-center">
+      <header className="flex flex-col items-center text-center mb-8 w-full max-w-5xl">
+        <div className="flex justify-between items-center w-full">
+           <div className="flex-1"></div>
+          <div className="flex-1 flex flex-col items-center">
             <Logo />
             <h1 className="text-4xl sm:text-5xl font-bold text-primary mt-2 font-headline">
               ReceiptRocket
             </h1>
+          </div>
+          <div className="flex-1 flex justify-end">
+            <AuthButton />
           </div>
         </div>
         <p className="text-lg text-muted-foreground mt-2 max-w-prose">
@@ -76,32 +93,48 @@ export default function Home() {
       </header>
 
       <main className="w-full max-w-5xl space-y-12">
-        <Card className="overflow-hidden shadow-lg">
-          <CardContent className="p-6">
-            <ReceiptUpload onUploadSuccess={fetchReceipts} />
-          </CardContent>
-        </Card>
-        
-        {error && (
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Error Loading Receipts</AlertTitle>
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
-
-        {isLoading ? (
-          <div className="space-y-4">
-             <Skeleton className="h-24 w-full" />
-             <Skeleton className="h-12 w-full" />
-             <Skeleton className="h-12 w-full" />
-             <Skeleton className="h-12 w-full" />
-          </div>
+        {showLoginPrompt ? (
+           <Card className="text-center shadow-lg">
+             <CardContent className="p-10">
+               <div className="mx-auto bg-primary/10 rounded-full p-3 w-fit mb-4">
+                 <LogIn className="h-8 w-8 text-primary" />
+               </div>
+               <h2 className="text-2xl font-bold">Welcome!</h2>
+               <p className="text-muted-foreground mt-2">
+                 Please sign in to upload and manage your receipts.
+               </p>
+             </CardContent>
+           </Card>
         ) : (
-          <ReceiptList 
-            receipts={receipts} 
-            onDeleteReceipt={handleDeleteReceipt}
-          />
+          <>
+            <Card className="overflow-hidden shadow-lg">
+              <CardContent className="p-6">
+                <ReceiptUpload onUploadSuccess={fetchReceipts} />
+              </CardContent>
+            </Card>
+            
+            {error && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Error Loading Receipts</AlertTitle>
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+
+            {isLoading || authLoading ? (
+              <div className="space-y-4">
+                <Skeleton className="h-24 w-full" />
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-12 w-full" />
+              </div>
+            ) : (
+              <ReceiptList 
+                receipts={receipts} 
+                onDeleteReceipt={handleDeleteReceipt}
+              />
+            )}
+          </>
         )}
       </main>
       
