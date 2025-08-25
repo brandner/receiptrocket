@@ -7,6 +7,7 @@ import admin, { type App, type ServiceAccount } from 'firebase-admin';
 import { getFirestore, type Firestore } from 'firebase-admin/firestore';
 import { getStorage, type Storage } from 'firebase-admin/storage';
 import { revalidatePath } from 'next/cache';
+import { randomUUID } from 'crypto';
 
 // --- Firebase Admin Initialization ---
 let db: Firestore;
@@ -83,7 +84,7 @@ export async function processAndSaveReceiptAction(
 
         // 2. Upload image to Firebase Storage
         const mimeType = photo.type || 'image/jpeg';
-        const fileName = `receipts/${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
+        const fileName = `receipts/${randomUUID()}.jpg`;
         const file = storage.bucket().file(fileName);
 
         await file.save(buffer, {
