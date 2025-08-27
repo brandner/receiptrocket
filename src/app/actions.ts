@@ -1,9 +1,6 @@
 
 'use server';
 
-import { config } from 'dotenv';
-config();
-
 import {extractReceiptData} from '@/ai/flows/extract-receipt-data';
 import type {Receipt} from '@/types';
 import admin, { type App, type ServiceAccount } from 'firebase-admin';
@@ -16,15 +13,16 @@ import { getAuth } from 'firebase-admin/auth';
 // --- Firebase Admin Initialization ---
 let db: Firestore;
 let storage: Storage;
+let initialized = false;
 
 const initializeFirebaseAdmin = () => {
-  if (admin.apps.length > 0) {
+  if (initialized) {
     const app = admin.app();
     db = getFirestore(app);
     storage = getStorage(app);
     return;
   }
-
+  
   if (!process.env.FIREBASE_PROJECT_ID || !process.env.FIREBASE_CLIENT_EMAIL || !process.env.FIREBASE_PRIVATE_KEY || !process.env.FIREBASE_STORAGE_BUCKET) {
     console.warn("Firebase Admin credentials or Storage Bucket not set. Skipping initialization.");
     return;
@@ -45,6 +43,7 @@ const initializeFirebaseAdmin = () => {
     });
     db = getFirestore(app);
     storage = getStorage(app);
+    initialized = true;
   } catch (error) {
     console.error("Firebase Admin SDK initialization error:", error);
   }
@@ -54,16 +53,20 @@ initializeFirebaseAdmin();
 
 // Helper to get current user's UID and verify token
 async function getVerifiedUserId(token: string | undefined): Promise<string | null> {
-  if (token) {
-    try {
-      const decodedToken = await getAuth().verifyIdToken(token);
-      return decodedToken.uid;
-    } catch (error) {
-      console.error('Error verifying auth token:', error);
-      return null;
-    }
+  if (!token) {
+    return null;
   }
-  return null;
+  if (!initialized) {
+    console.error('Firebase Admin not initialized. Cannot verify user token.');
+    return null;
+  }
+  try {
+    const decodedToken = await getAuth().verifyIdToken(token);
+    return decodedToken.uid;
+  } catch (error) {
+    console.error('Error verifying auth token:', error);
+    return null;
+  }
 }
 // --- End Firebase Admin Initialization ---
 
@@ -176,7 +179,7 @@ export async function processAndSaveReceiptAction(
 }
 
 
-export async function getReceiptsAction(idToken: string): Promise<Receipt[]> {
+export async function getReceiptsAction(idToken: string | undefined): Promise<Receipt[]> {
     const userId = await getVerifiedUserId(idToken);
     if (!userId) {
         return [];
@@ -228,7 +231,7 @@ export async function getReceiptsAction(idToken: string): Promise<Receipt[]> {
     }
 }
 
-export async function deleteReceiptAction(id: string, idToken: string): Promise<{ success: boolean, message: string }> {
+export async function deleteReceiptAction(id: string, idToken: string | undefined): Promise<{ success: boolean, message: string }> {
     const userId = await getVerifiedUserId(idToken);
     if (!userId) {
         return { success: false, message: 'You must be logged in to delete receipts.' };
