@@ -8,29 +8,50 @@ You need a Firebase project to run this application. If you don't have one, crea
 
 ## 2. Environment Variables
 
-Create a `.env` file in the root of the project. This file will hold your Firebase project's credentials. Populate it with the following keys.
+Create a `.env` file in the root of the project. This file holds your Firebase project's public and private credentials.
 
-**Example `.env`:**
+**You must populate all values in this file for the app to work.**
+
 ```
-# Firebase Service Account Credentials
+# --- Server-Side Admin Credentials (for Server Actions) ---
 FIREBASE_PROJECT_ID="your-firebase-project-id"
 FIREBASE_CLIENT_EMAIL="firebase-adminsdk-xxxxx@your-project-id.iam.gserviceaccount.com"
 FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\\n...your-private-key...\\n-----END PRIVATE KEY-----\\n"
-
-# Firebase Storage Bucket URL
 FIREBASE_STORAGE_BUCKET="your-project-id.appspot.com"
+
+# --- Client-Side App Credentials (for the browser) ---
+NEXT_PUBLIC_FIREBASE_API_KEY="your-public-api-key"
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN="your-project-id.firebaseapp.com"
+NEXT_PUBLIC_FIREBASE_PROJECT_ID="your-firebase-project-id"
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET="your-project-id.appspot.com"
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID="your-messaging-sender-id"
+NEXT_PUBLIC_FIREBASE_APP_ID="your-web-app-id"
 ```
 
-### How to get these values:
+### How to get Server-Side Admin Credentials:
 
-1.  Navigate to **Project settings** (the gear icon) in your Firebase project console.
+1.  In your Firebase project, go to **Project settings** (the gear icon).
 2.  Go to the **Service accounts** tab.
 3.  Click **Generate new private key**. A JSON file will be downloaded.
 4.  Open the JSON file and find the corresponding values:
     *   `project_id` -> `FIREBASE_PROJECT_ID`
     *   `client_email` -> `FIREBASE_CLIENT_EMAIL`
     *   `private_key` -> `FIREBASE_PRIVATE_KEY` (Important: Ensure the private key is enclosed in double quotes and newlines are escaped as `\n`).
-5.  For `FIREBASE_STORAGE_BUCKET`, navigate to the **Storage** section in your Firebase console. The bucket URL (e.g., `your-project-id.appspot.com`) will be listed at the top of the Files tab.
+
+### How to get Client-Side App Credentials:
+
+1.  In your Firebase project, go to **Project settings** (the gear icon).
+2.  In the **General** tab, scroll down to the **Your apps** section.
+3.  If you haven't created a web app yet, click the `</>` (Web) icon to create one.
+4.  Once you have a web app, select it.
+5.  Choose **Config** as the view option.
+6.  You will see a `firebaseConfig` object. Copy the values from this object into the corresponding `NEXT_PUBLIC_` variables in your `.env` file.
+    *   `apiKey` -> `NEXT_PUBLIC_FIREBASE_API_KEY`
+    *   `authDomain` -> `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`
+    *   `projectId` -> `NEXT_PUBLIC_FIREBASE_PROJECT_ID`
+    *   `storageBucket` -> `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`
+    *   `messagingSenderId` -> `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`
+    *   `appId` -> `NEXT_PUBLIC_FIREBASE_APP_ID`
 
 ## 3. Enable Firebase Services
 
