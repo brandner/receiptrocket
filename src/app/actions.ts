@@ -2,7 +2,7 @@
 'use server';
 
 import {extractReceiptData} from '@/ai/flows/extract-receipt-data';
-import type {Receipt, UserProfile} from '@/types';
+import type {Receipt} from '@/types';
 import admin, { type App, type ServiceAccount } from 'firebase-admin';
 import { getFirestore, type Firestore } from 'firebase-admin/firestore';
 import { getStorage, type Storage } from 'firebase-admin/storage';
@@ -51,8 +51,8 @@ const initializeFirebaseAdmin = () => {
 initializeFirebaseAdmin();
 
 // Helper to get current user's UID and verify token
-async function getVerifiedUserId(idToken?: string): Promise<string | null> {
-  const token = idToken || headers().get('Authorization')?.split('Bearer ')[1];
+async function getVerifiedUserId(): Promise<string | null> {
+  const token = headers().get('Authorization')?.split('Bearer ')[1];
   if (token) {
     try {
       const decodedToken = await getAuth().verifyIdToken(token);
@@ -65,44 +65,6 @@ async function getVerifiedUserId(idToken?: string): Promise<string | null> {
   return null;
 }
 // --- End Firebase Admin Initialization ---
-
-// --- User Profile Actions ---
-export async function getOrCreateUserProfile(idToken: string): Promise<UserProfile | null> {
-    if (!idToken) {
-        return null;
-    }
-    
-    try {
-        const decodedToken = await getAuth().verifyIdToken(idToken);
-        const { uid, email, name, picture } = decodedToken;
-
-        if (!db) {
-            console.error("Firestore is not initialized. Cannot fetch user profile.");
-            return null;
-        }
-
-        const userRef = db.collection('users').doc(uid);
-        const userDoc = await userRef.get();
-
-        if (userDoc.exists) {
-            return userDoc.data() as UserProfile;
-        } else {
-            const newUserProfile: UserProfile = {
-                uid,
-                email: email || null,
-                displayName: name || null,
-                photoURL: picture || null,
-                subscription: 'free', // New users start with a free plan
-            };
-            await userRef.set(newUserProfile);
-            return newUserProfile;
-        }
-    } catch (error) {
-        console.error('Error getting or creating user profile:', error);
-        return null;
-    }
-}
-
 
 type ProcessAndSaveState = {
   message: string;

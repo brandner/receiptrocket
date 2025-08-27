@@ -14,12 +14,9 @@ export type Receipt = {
   userId: string;
 } & ReceiptData;
 
-export type SubscriptionStatus = 'free' | 'paid';
-
 export type UserProfile = {
   uid: string;
   email: string | null;
   displayName: string | null;
   photoURL: string | null;
-  subscription: SubscriptionStatus;
 };

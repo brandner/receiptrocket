@@ -7,7 +7,6 @@ import {
   useEffect,
   useState,
   type ReactNode,
-  useCallback,
 } from 'react';
 import {
   onAuthStateChanged,
@@ -18,12 +17,10 @@ import {
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useToast } from './use-toast';
-import type { UserProfile } from '@/types';
-import { getOrCreateUserProfile } from '@/app/actions';
+
 
 interface AuthContextType {
   user: User | null;
-  userProfile: UserProfile | null;
   loading: boolean;
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
@@ -31,10 +28,11 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Store the original fetch function to be used for unauthenticated requests
+// Store the original fetch function.
 const originalFetch = globalThis.fetch;
 
-async function configureAuthenticatedFetch(idToken: string) {
+async function configureAuthenticatedFetch(user: User) {
+  const idToken = await user.getIdToken();
   // Create a custom fetch that includes the auth token
   const customFetch = (
     input: RequestInfo | URL,
@@ -60,57 +58,27 @@ function restoreOriginalFetch() {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  const handleAuthChange = useCallback(async (firebaseUser: User | null) => {
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       setLoading(true);
       setUser(firebaseUser);
-
       if (firebaseUser) {
-          try {
-              const idToken = await firebaseUser.getIdToken();
-              // Pass the token directly to the action
-              const profile = await getOrCreateUserProfile(idToken);
-              setUserProfile(profile);
-          } catch (error) {
-              console.error("Error fetching user profile:", error);
-              setUserProfile(null);
-          }
+        configureAuthenticatedFetch(firebaseUser);
       } else {
-          setUserProfile(null);
+        restoreOriginalFetch();
       }
       setLoading(false);
-  }, []);
+    });
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, handleAuthChange);
-    return () => unsubscribe();
-  }, [handleAuthChange]);
-  
-  // This separate effect handles configuring the fetch wrapper for server actions
-  useEffect(() => {
-    const setupFetch = async () => {
-        if (user) {
-            const idToken = await user.getIdToken();
-            await configureAuthenticatedFetch(idToken);
-        } else {
-            restoreOriginalFetch();
-        }
-    };
-    setupFetch();
-
-    // Re-run when user changes
-  }, [user]);
-  
-  // Cleanup on unmount
-  useEffect(() => {
+    // Cleanup subscription on unmount
     return () => {
-        restoreOriginalFetch();
-    }
+      unsubscribe();
+      restoreOriginalFetch();
+    };
   }, []);
-
 
   const signInWithGoogle = async () => {
     const provider = new GoogleAuthProvider();
@@ -150,7 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, userProfile, loading, signInWithGoogle, signOut }}>
+    <AuthContext.Provider value={{ user, loading, signInWithGoogle, signOut }}>
       {children}
     </AuthContext.Provider>
   );

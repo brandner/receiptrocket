@@ -12,11 +12,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from './ui/dropdown-menu';
-import { LogIn, LogOut, User as UserIcon, Gem } from 'lucide-react';
+import { LogIn, LogOut, User as UserIcon } from 'lucide-react';
 import { Skeleton } from './ui/skeleton';
 
 export default function AuthButton() {
-  const { user, userProfile, signInWithGoogle, signOut, loading } = useAuth();
+  const { user, signInWithGoogle, signOut, loading } = useAuth();
 
   if (loading) {
     return <Skeleton className="h-10 w-24" />;
@@ -51,13 +51,6 @@ export default function AuthButton() {
             </p>
           </div>
         </DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        {userProfile && (
-            <div className="px-2 py-1.5 text-xs text-muted-foreground flex items-center">
-                 <Gem className="mr-2 h-4 w-4 text-primary" />
-                <span className="capitalize">{userProfile.subscription} Plan</span>
-            </div>
-        )}
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={signOut}>
           <LogOut className="mr-2 h-4 w-4" />
