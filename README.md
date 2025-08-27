@@ -38,11 +38,7 @@ This project is built with a modern, full-stack TypeScript architecture:
     ```
 
 3.  **Configure Firebase:**
-    - Create a `.env` file in the root of the project.
-    - Populate it with your Firebase project's service account credentials and storage bucket name. See `.env.example` for the required fields.
-    - In your Firebase project console, enable **Authentication** with the **Google** provider.
-    - In your Firebase project console, create a **Firestore Database** in production mode.
-    - In your Firebase project console, ensure **Cloud Storage** is enabled.
+    - Follow the detailed instructions in the [**Configuration Guide**](./docs/configuration.md) to set up your Firebase project and environment variables.
 
 4.  **Run the development server:**
     ```bash
