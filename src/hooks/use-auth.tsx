@@ -7,6 +7,7 @@ import {
   useEffect,
   useState,
   type ReactNode,
+  useCallback,
 } from 'react';
 import {
   onAuthStateChanged,
@@ -17,9 +18,12 @@ import {
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useToast } from './use-toast';
+import type { UserProfile } from '@/types';
+import { getOrCreateUserProfile } from '@/app/actions';
 
 interface AuthContextType {
   user: User | null;
+  userProfile: UserProfile | null;
   loading: boolean;
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
@@ -30,13 +34,13 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 // Store the original fetch function
 const originalFetch = globalThis.fetch;
 
-async function getAuthenticatedAppForUser(user: User | null) {
+async function configureAuthenticatedFetch(user: User | null) {
   if (!user) {
     // If user is logged out, restore the original fetch
     if (globalThis.fetch !== originalFetch) {
-       globalThis.fetch = originalFetch;
+      globalThis.fetch = originalFetch;
     }
-    return null;
+    return;
   }
   const idToken = await user.getIdToken();
 
@@ -54,21 +58,30 @@ async function getAuthenticatedAppForUser(user: User | null) {
   
   // Monkey-patch the global fetch
   globalThis.fetch = customFetch;
-
-  return { user };
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setUser(user);
-      await getAuthenticatedAppForUser(user);
+  const handleAuthChange = useCallback(async (firebaseUser: User | null) => {
+      setLoading(true);
+      await configureAuthenticatedFetch(firebaseUser);
+      setUser(firebaseUser);
+
+      if (firebaseUser) {
+          const profile = await getOrCreateUserProfile();
+          setUserProfile(profile);
+      } else {
+          setUserProfile(null);
+      }
       setLoading(false);
-    });
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, handleAuthChange);
 
     return () => {
       unsubscribe();
@@ -77,15 +90,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         globalThis.fetch = originalFetch;
       }
     }
-  }, []);
+  }, [handleAuthChange]);
 
   const signInWithGoogle = async () => {
     const provider = new GoogleAuthProvider();
     try {
-      await signInWithPopup(auth, provider);
+      const result = await signInWithPopup(auth, provider);
+      // The onAuthStateChanged listener will handle the user state update.
       toast({
         title: "Signed In",
-        description: "You've successfully signed in.",
+        description: `Welcome, ${result.user.displayName}!`,
       })
     } catch (error: any) {
       console.error('Error signing in with Google:', error);
@@ -100,6 +114,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     try {
       await firebaseSignOut(auth);
+      // The onAuthStateChanged listener will handle clearing user state.
        toast({
         title: "Signed Out",
         description: "You've successfully signed out.",
@@ -115,7 +130,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, signInWithGoogle, signOut }}>
+    <AuthContext.Provider value={{ user, userProfile, loading, signInWithGoogle, signOut }}>
       {children}
     </AuthContext.Provider>
   );

@@ -13,3 +13,13 @@ export type Receipt = {
   date: string; // ISO string
   userId: string;
 } & ReceiptData;
+
+export type SubscriptionStatus = 'free' | 'paid';
+
+export type UserProfile = {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+  photoURL: string | null;
+  subscription: SubscriptionStatus;
+};

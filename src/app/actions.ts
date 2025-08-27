@@ -2,7 +2,7 @@
 'use server';
 
 import {extractReceiptData} from '@/ai/flows/extract-receipt-data';
-import type {Receipt} from '@/types';
+import type {Receipt, UserProfile} from '@/types';
 import admin, { type App, type ServiceAccount } from 'firebase-admin';
 import { getFirestore, type Firestore } from 'firebase-admin/firestore';
 import { getStorage, type Storage } from 'firebase-admin/storage';
@@ -50,8 +50,8 @@ const initializeFirebaseAdmin = () => {
 
 initializeFirebaseAdmin();
 
-// Helper to get current user's UID
-async function getUserId(): Promise<string | null> {
+// Helper to get current user's UID and verify token
+async function getVerifiedUserId(): Promise<string | null> {
   const authorization = headers().get('Authorization');
   if (authorization?.startsWith('Bearer ')) {
     const idToken = authorization.split('Bearer ')[1];
@@ -67,6 +67,46 @@ async function getUserId(): Promise<string | null> {
 }
 // --- End Firebase Admin Initialization ---
 
+// --- User Profile Actions ---
+export async function getOrCreateUserProfile(): Promise<UserProfile | null> {
+    const authorization = headers().get('Authorization');
+    if (!authorization?.startsWith('Bearer ')) {
+        return null;
+    }
+    const idToken = authorization.split('Bearer ')[1];
+    
+    try {
+        const decodedToken = await getAuth().verifyIdToken(idToken);
+        const { uid, email, name, picture } = decodedToken;
+
+        if (!db) {
+            console.error("Firestore is not initialized. Cannot fetch user profile.");
+            return null;
+        }
+
+        const userRef = db.collection('users').doc(uid);
+        const userDoc = await userRef.get();
+
+        if (userDoc.exists) {
+            return userDoc.data() as UserProfile;
+        } else {
+            const newUserProfile: UserProfile = {
+                uid,
+                email: email || null,
+                displayName: name || null,
+                photoURL: picture || null,
+                subscription: 'free', // New users start with a free plan
+            };
+            await userRef.set(newUserProfile);
+            return newUserProfile;
+        }
+    } catch (error) {
+        console.error('Error getting or creating user profile:', error);
+        return null;
+    }
+}
+
+
 type ProcessAndSaveState = {
   message: string;
   error: boolean;
@@ -78,7 +118,7 @@ export async function processAndSaveReceiptAction(
   prevState: ProcessAndSaveState,
   formData: FormData
 ): Promise<ProcessAndSaveState> {
-    const userId = await getUserId();
+    const userId = await getVerifiedUserId();
     if (!userId) {
         return { message: 'You must be logged in to upload receipts.', error: true };
     }
@@ -176,7 +216,7 @@ export async function processAndSaveReceiptAction(
 
 
 export async function getReceiptsAction(): Promise<Receipt[]> {
-    const userId = await getUserId();
+    const userId = await getVerifiedUserId();
     if (!userId) {
         return [];
     }
@@ -228,7 +268,7 @@ export async function getReceiptsAction(): Promise<Receipt[]> {
 }
 
 export async function deleteReceiptAction(id: string): Promise<{ success: boolean, message: string }> {
-    const userId = await getUserId();
+    const userId = await getVerifiedUserId();
     if (!userId) {
         return { success: false, message: 'You must be logged in to delete receipts.' };
     }
