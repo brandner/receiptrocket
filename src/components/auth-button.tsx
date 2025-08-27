@@ -14,7 +14,6 @@ import {
 } from './ui/dropdown-menu';
 import { LogIn, LogOut, User as UserIcon, Gem } from 'lucide-react';
 import { Skeleton } from './ui/skeleton';
-import { Badge } from './ui/badge';
 
 export default function AuthButton() {
   const { user, userProfile, signInWithGoogle, signOut, loading } = useAuth();
@@ -59,6 +58,7 @@ export default function AuthButton() {
                 <span className="capitalize">{userProfile.subscription} Plan</span>
             </div>
         )}
+        <DropdownMenuSeparator />
         <DropdownMenuItem onClick={signOut}>
           <LogOut className="mr-2 h-4 w-4" />
           <span>Log out</span>
