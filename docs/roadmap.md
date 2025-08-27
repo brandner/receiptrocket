@@ -57,6 +57,12 @@ These features will significantly enhance the user experience and utility of the
     - Add a search bar to filter by Company Name or Description.
     - Implement a date range picker to show receipts from a specific period.
 
+### 4. Export to Google Sheets
+
+- **Goal**: Allow users to send their receipt data directly to a Google Sheet.
+- **Description**: A "one-click" export feature that connects to the user's Google account (via OAuth) and creates or updates a Google Sheet with their receipt data.
+- **Task**: Implement the Google Sheets API integration, handle authentication, and create the server action to transfer the data.
+
 ---
 
 ## 🔭 Future Vision (Long-Term)
