@@ -3,13 +3,12 @@ import { initializeApp, getApp, getApps } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 
 const firebaseConfig = {
-  projectId: "receiptrocket-h9b5k",
-  appId: "1:496558310903:web:4202e84340a0d1ecb39af2",
-  storageBucket: "receiptrocket-h9b5k.firebasestorage.app",
-  apiKey: "AIzaSyCjApwkvKAOCONGyipL7YWgYe_Ucp2-RZo",
-  authDomain: "receiptrocket-h9b5k.firebaseapp.com",
-  measurementId: "",
-  messagingSenderId: "496558310903"
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
 };
 
 // Initialize Firebase
