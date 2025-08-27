@@ -28,34 +28,6 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Store the original fetch function.
-const originalFetch = globalThis.fetch;
-
-async function configureAuthenticatedFetch(user: User) {
-  const idToken = await user.getIdToken();
-  // Create a custom fetch that includes the auth token
-  const customFetch = (
-    input: RequestInfo | URL,
-    init?: RequestInit
-  ): Promise<Response> => {
-    const headers = new Headers(init?.headers);
-    headers.set('Authorization', `Bearer ${idToken}`);
-    const newInit: RequestInit = { ...init, headers };
-    // Call the original fetch, not the monkey-patched one, to avoid recursion
-    return originalFetch(input, newInit);
-  };
-  
-  // Monkey-patch the global fetch
-  globalThis.fetch = customFetch;
-}
-
-function restoreOriginalFetch() {
-    if (globalThis.fetch !== originalFetch) {
-        globalThis.fetch = originalFetch;
-    }
-}
-
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -65,19 +37,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       setLoading(true);
       setUser(firebaseUser);
-      if (firebaseUser) {
-        configureAuthenticatedFetch(firebaseUser);
-      } else {
-        restoreOriginalFetch();
-      }
       setLoading(false);
     });
 
     // Cleanup subscription on unmount
-    return () => {
-      unsubscribe();
-      restoreOriginalFetch();
-    };
+    return () => unsubscribe();
   }, []);
 
   const signInWithGoogle = async () => {

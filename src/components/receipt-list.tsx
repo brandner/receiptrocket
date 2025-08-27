@@ -2,7 +2,7 @@
 'use client';
 
 import Image from 'next/image';
-import { Eye, ReceiptText, FileDown, Trash2 } from 'lucide-react';
+import { Eye, ReceiptText, FileDown, Trash2, Sheet } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -106,15 +106,21 @@ export default function ReceiptList({ receipts, onDeleteReceipt }: ReceiptListPr
 
   return (
     <Card className="shadow-lg">
-      <CardHeader className="flex flex-row items-center justify-between">
+      <CardHeader className="flex-col sm:flex-row items-start sm:items-center sm:justify-between gap-4">
         <div>
           <CardTitle>Processed Receipts</CardTitle>
           <CardDescription>Here is a list of all your scanned receipts.</CardDescription>
         </div>
-        <Button onClick={handleExportCSV} variant="outline" disabled={receipts.length === 0}>
-          <FileDown className="mr-2 h-4 w-4" />
-          Export CSV
-        </Button>
+        <div className="flex gap-2 w-full sm:w-auto">
+             <Button onClick={() => {}} variant="outline" disabled={true} className="w-full sm:w-auto">
+                <Sheet className="mr-2 h-4 w-4" />
+                Export to Sheets
+            </Button>
+            <Button onClick={handleExportCSV} variant="outline" disabled={receipts.length === 0} className="w-full sm:w-auto">
+                <FileDown className="mr-2 h-4 w-4" />
+                Export CSV
+            </Button>
+        </div>
       </CardHeader>
       <CardContent>
         <div className="rounded-md border">

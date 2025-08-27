@@ -14,6 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/hooks/use-auth';
 
 type ReceiptUploadProps = {
   onUploadSuccess: () => void;
@@ -56,6 +57,18 @@ export default function ReceiptUpload({ onUploadSuccess }: ReceiptUploadProps) {
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const { toast } = useToast();
   const formRef = useRef<HTMLFormElement>(null);
+  const { user } = useAuth();
+  const [idToken, setIdToken] = useState<string>('');
+
+  useEffect(() => {
+    const fetchToken = async () => {
+        if (user) {
+            const token = await user.getIdToken();
+            setIdToken(token);
+        }
+    };
+    fetchToken();
+  }, [user]);
 
   useEffect(() => {
     return () => {
@@ -164,20 +177,6 @@ export default function ReceiptUpload({ onUploadSuccess }: ReceiptUploadProps) {
       }
     }
   };
-
-  const onFormSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const formData = new FormData(event.currentTarget);
-    
-    // If a file was selected via camera, it's in `selectedFile` state.
-    // The regular file input is handled automatically by FormData.
-    // We only need to append if the camera was used and the file input is empty.
-    if (selectedFile && !formData.get('photo')) {
-      formData.set('photo', selectedFile);
-    }
-
-    formAction(formData);
-  };
   
   return (
     <div>
@@ -196,6 +195,8 @@ export default function ReceiptUpload({ onUploadSuccess }: ReceiptUploadProps) {
       )}
 
       <form ref={formRef} action={formAction} className="space-y-6">
+        <input type="hidden" name="idToken" value={idToken} />
+
         <Tabs value={uploadMode} onValueChange={(value) => setUploadMode(value as any)} className="w-full mb-4">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="upload"><UploadCloud className="mr-2 h-4 w-4" /> File Upload</TabsTrigger>
@@ -272,8 +273,7 @@ export default function ReceiptUpload({ onUploadSuccess }: ReceiptUploadProps) {
                     <canvas ref={canvasRef} className="hidden" />
                     {hasCameraPermission === false && (
                       <Alert variant="destructive" className="m-4">
-                        <AlertTitle>Camera Access Denied</AlertTitle>
-                        <AlertDescription>
+                        <AlertTitle>Camera Access Denied</AlertTitle>                        <AlertDescription>
                           Please enable camera permissions to use this feature.
                         </AlertDescription>
                       </Alert>
@@ -296,23 +296,26 @@ export default function ReceiptUpload({ onUploadSuccess }: ReceiptUploadProps) {
           </TabsContent>
         </Tabs>
         
-        {/* Hidden input to carry the camera file */}
-        <input 
-          type="file" 
-          name="photo" 
-          ref={el => {
-            if (el && selectedFile) {
-              const dataTransfer = new DataTransfer();
-              dataTransfer.items.add(selectedFile);
-              el.files = dataTransfer.files;
-            }
-          }}
-          className="hidden" 
-          readOnly
-        />
+        {/* Hidden input to carry the camera file if it's not in the regular file input */}
+        {selectedFile && uploadMode === 'camera' && (
+             <input 
+                type="file" 
+                name="photo" 
+                ref={el => {
+                    if (el && selectedFile) {
+                    const dataTransfer = new DataTransfer();
+                    dataTransfer.items.add(selectedFile);
+                    el.files = dataTransfer.files;
+                    }
+                }}
+                className="hidden" 
+                readOnly
+            />
+        )}
+
 
         <div className="flex justify-center">
-          <SubmitButton disabled={!imagePreview && !selectedFile} />
+          <SubmitButton disabled={!selectedFile} />
         </div>
       </form>
     </div>

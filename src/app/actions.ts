@@ -9,7 +9,6 @@ import { getStorage, type Storage } from 'firebase-admin/storage';
 import { revalidatePath } from 'next/cache';
 import { randomUUID } from 'crypto';
 import { getAuth } from 'firebase-admin/auth';
-import { headers } from 'next/headers';
 
 // --- Firebase Admin Initialization ---
 let db: Firestore;
@@ -51,8 +50,7 @@ const initializeFirebaseAdmin = () => {
 initializeFirebaseAdmin();
 
 // Helper to get current user's UID and verify token
-async function getVerifiedUserId(): Promise<string | null> {
-  const token = headers().get('Authorization')?.split('Bearer ')[1];
+async function getVerifiedUserId(token: string | undefined): Promise<string | null> {
   if (token) {
     try {
       const decodedToken = await getAuth().verifyIdToken(token);
@@ -77,7 +75,8 @@ export async function processAndSaveReceiptAction(
   prevState: ProcessAndSaveState,
   formData: FormData
 ): Promise<ProcessAndSaveState> {
-    const userId = await getVerifiedUserId();
+    const idToken = formData.get('idToken') as string | undefined;
+    const userId = await getVerifiedUserId(idToken);
     if (!userId) {
         return { message: 'You must be logged in to upload receipts.', error: true };
     }
@@ -174,8 +173,8 @@ export async function processAndSaveReceiptAction(
 }
 
 
-export async function getReceiptsAction(): Promise<Receipt[]> {
-    const userId = await getVerifiedUserId();
+export async function getReceiptsAction(idToken: string): Promise<Receipt[]> {
+    const userId = await getVerifiedUserId(idToken);
     if (!userId) {
         return [];
     }
@@ -226,8 +225,8 @@ export async function getReceiptsAction(): Promise<Receipt[]> {
     }
 }
 
-export async function deleteReceiptAction(id: string): Promise<{ success: boolean, message: string }> {
-    const userId = await getVerifiedUserId();
+export async function deleteReceiptAction(id: string, idToken: string): Promise<{ success: boolean, message: string }> {
+    const userId = await getVerifiedUserId(idToken);
     if (!userId) {
         return { success: false, message: 'You must be logged in to delete receipts.' };
     }

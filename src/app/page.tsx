@@ -11,9 +11,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { getReceiptsAction, deleteReceiptAction } from '@/app/actions';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertCircle, LogIn, ReceiptText } from 'lucide-react';
+import { AlertCircle, LogIn, ReceiptText, FileDown } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import AuthButton from '@/components/auth-button';
+import { Button } from '@/components/ui/button';
 
 export default function Home() {
   const [receipts, setReceipts] = useState<Receipt[]>([]);
@@ -31,7 +32,8 @@ export default function Home() {
     setIsLoading(true);
     setError(null);
     try {
-      const fetchedReceipts = await getReceiptsAction();
+      const idToken = await user.getIdToken();
+      const fetchedReceipts = await getReceiptsAction(idToken);
       setReceipts(fetchedReceipts);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred.';
@@ -50,25 +52,45 @@ export default function Home() {
   }, [fetchReceipts, authLoading]);
 
   const handleDeleteReceipt = useCallback(async (id: string) => {
+    if (!user) {
+        toast({
+            variant: 'destructive',
+            title: 'Authentication Error',
+            description: 'You must be logged in to delete a receipt.',
+        });
+        return;
+    }
+
     const originalReceipts = [...receipts];
     setReceipts(prev => prev.filter(receipt => receipt.id !== id));
     
-    const result = await deleteReceiptAction(id);
-    
-    if (result.success) {
-      toast({
-        title: 'Receipt Deleted',
-        description: 'The receipt has been removed from your database.',
-      });
-    } else {
-      toast({
-        variant: 'destructive',
-        title: 'Error Deleting',
-        description: result.message,
-      });
-      setReceipts(originalReceipts); // Revert on failure
+    try {
+        const idToken = await user.getIdToken();
+        const result = await deleteReceiptAction(id, idToken);
+        
+        if (result.success) {
+        toast({
+            title: 'Receipt Deleted',
+            description: 'The receipt has been removed from your database.',
+        });
+        } else {
+        toast({
+            variant: 'destructive',
+            title: 'Error Deleting',
+            description: result.message,
+        });
+        setReceipts(originalReceipts); // Revert on failure
+        }
+    } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred.';
+        toast({
+            variant: 'destructive',
+            title: 'Error Deleting',
+            description: errorMessage,
+        });
+        setReceipts(originalReceipts);
     }
-  }, [receipts, toast]);
+  }, [receipts, toast, user]);
   
   const showLoginPrompt = !user && !authLoading;
 
