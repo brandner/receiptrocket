@@ -3,7 +3,7 @@
 
 import {extractReceiptData} from '@/ai/flows/extract-receipt-data';
 import type {Receipt} from '@/types';
-import admin, { type App, type ServiceAccount } from 'firebase-admin';
+import admin from 'firebase-admin';
 import { getFirestore, type Firestore } from 'firebase-admin/firestore';
 import { getStorage, type Storage } from 'firebase-admin/storage';
 import { revalidatePath } from 'next/cache';
@@ -15,41 +15,33 @@ let db: Firestore;
 let storage: Storage;
 let initialized = false;
 
-const initializeFirebaseAdmin = () => {
-  if (initialized) {
-    const app = admin.app();
-    db = getFirestore(app);
-    storage = getStorage(app);
-    return;
-  }
-  
-  if (!process.env.FIREBASE_PROJECT_ID || !process.env.FIREBASE_CLIENT_EMAIL || !process.env.FIREBASE_PRIVATE_KEY || !process.env.FIREBASE_STORAGE_BUCKET) {
-    console.warn("Firebase Admin credentials or Storage Bucket not set. Skipping initialization.");
-    return;
-  }
-
-  const privateKey = process.env.FIREBASE_PRIVATE_KEY!.replace(/\\n/g, '\n');
-
-  const credentials: ServiceAccount = {
-    projectId: process.env.FIREBASE_PROJECT_ID!,
-    clientEmail: process.env.FIREBASE_CLIENT_EMAIL!,
-    privateKey: privateKey,
-  };
-
-  try {
-    const app = admin.initializeApp({
-      credential: admin.credential.cert(credentials),
-      storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
-    });
-    db = getFirestore(app);
-    storage = getStorage(app);
-    initialized = true;
-  } catch (error) {
-    console.error("Firebase Admin SDK initialization error:", error);
-  }
-};
-
-initializeFirebaseAdmin();
+if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_STORAGE_BUCKET) {
+    if (!admin.apps.length) {
+        const privateKey = process.env.FIREBASE_PRIVATE_KEY!.replace(/\\n/g, '\n');
+        try {
+            const app = admin.initializeApp({
+                credential: admin.credential.cert({
+                    projectId: process.env.FIREBASE_PROJECT_ID,
+                    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+                    privateKey: privateKey,
+                }),
+                storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
+            });
+            db = getFirestore(app);
+            storage = getStorage(app);
+            initialized = true;
+        } catch (error: any) {
+            console.error("Firebase Admin SDK initialization error:", error.message);
+        }
+    } else {
+        const app = admin.app();
+        db = getFirestore(app);
+        storage = getStorage(app);
+        initialized = true;
+    }
+} else {
+    console.warn("Firebase Admin credentials or Storage Bucket not set. Server actions requiring auth or storage will fail.");
+}
 
 // Helper to get current user's UID and verify token
 async function getVerifiedUserId(token: string | undefined): Promise<string | null> {
