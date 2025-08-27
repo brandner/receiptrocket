@@ -31,19 +31,10 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Store the original fetch function
+// Store the original fetch function to be used for unauthenticated requests
 const originalFetch = globalThis.fetch;
 
-async function configureAuthenticatedFetch(user: User | null) {
-  if (!user) {
-    // If user is logged out, restore the original fetch
-    if (globalThis.fetch !== originalFetch) {
-      globalThis.fetch = originalFetch;
-    }
-    return;
-  }
-  const idToken = await user.getIdToken();
-
+async function configureAuthenticatedFetch(idToken: string) {
   // Create a custom fetch that includes the auth token
   const customFetch = (
     input: RequestInfo | URL,
@@ -52,13 +43,20 @@ async function configureAuthenticatedFetch(user: User | null) {
     const headers = new Headers(init?.headers);
     headers.set('Authorization', `Bearer ${idToken}`);
     const newInit: RequestInit = { ...init, headers };
-    // Call the original fetch, not the monkey-patched one
+    // Call the original fetch, not the monkey-patched one, to avoid recursion
     return originalFetch(input, newInit);
   };
   
   // Monkey-patch the global fetch
   globalThis.fetch = customFetch;
 }
+
+function restoreOriginalFetch() {
+    if (globalThis.fetch !== originalFetch) {
+        globalThis.fetch = originalFetch;
+    }
+}
+
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -68,12 +66,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const handleAuthChange = useCallback(async (firebaseUser: User | null) => {
       setLoading(true);
-      await configureAuthenticatedFetch(firebaseUser);
       setUser(firebaseUser);
 
       if (firebaseUser) {
-          const profile = await getOrCreateUserProfile();
-          setUserProfile(profile);
+          try {
+              const idToken = await firebaseUser.getIdToken();
+              // Pass the token directly to the action
+              const profile = await getOrCreateUserProfile(idToken);
+              setUserProfile(profile);
+          } catch (error) {
+              console.error("Error fetching user profile:", error);
+              setUserProfile(null);
+          }
       } else {
           setUserProfile(null);
       }
@@ -82,15 +86,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, handleAuthChange);
-
-    return () => {
-      unsubscribe();
-      // Restore original fetch on cleanup
-      if (globalThis.fetch !== originalFetch) {
-        globalThis.fetch = originalFetch;
-      }
-    }
+    return () => unsubscribe();
   }, [handleAuthChange]);
+  
+  // This separate effect handles configuring the fetch wrapper for server actions
+  useEffect(() => {
+    const setupFetch = async () => {
+        if (user) {
+            const idToken = await user.getIdToken();
+            await configureAuthenticatedFetch(idToken);
+        } else {
+            restoreOriginalFetch();
+        }
+    };
+    setupFetch();
+
+    // Re-run when user changes
+  }, [user]);
+  
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+        restoreOriginalFetch();
+    }
+  }, []);
+
 
   const signInWithGoogle = async () => {
     const provider = new GoogleAuthProvider();

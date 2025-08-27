@@ -51,12 +51,11 @@ const initializeFirebaseAdmin = () => {
 initializeFirebaseAdmin();
 
 // Helper to get current user's UID and verify token
-async function getVerifiedUserId(): Promise<string | null> {
-  const authorization = headers().get('Authorization');
-  if (authorization?.startsWith('Bearer ')) {
-    const idToken = authorization.split('Bearer ')[1];
+async function getVerifiedUserId(idToken?: string): Promise<string | null> {
+  const token = idToken || headers().get('Authorization')?.split('Bearer ')[1];
+  if (token) {
     try {
-      const decodedToken = await getAuth().verifyIdToken(idToken);
+      const decodedToken = await getAuth().verifyIdToken(token);
       return decodedToken.uid;
     } catch (error) {
       console.error('Error verifying auth token:', error);
@@ -68,12 +67,10 @@ async function getVerifiedUserId(): Promise<string | null> {
 // --- End Firebase Admin Initialization ---
 
 // --- User Profile Actions ---
-export async function getOrCreateUserProfile(): Promise<UserProfile | null> {
-    const authorization = headers().get('Authorization');
-    if (!authorization?.startsWith('Bearer ')) {
+export async function getOrCreateUserProfile(idToken: string): Promise<UserProfile | null> {
+    if (!idToken) {
         return null;
     }
-    const idToken = authorization.split('Bearer ')[1];
     
     try {
         const decodedToken = await getAuth().verifyIdToken(idToken);
