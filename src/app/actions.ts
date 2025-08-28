@@ -15,36 +15,45 @@ let db: Firestore;
 let storage: Storage;
 let initialized = false;
 
-if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_STORAGE_BUCKET) {
-    if (!admin.apps.length) {
+function initializeFirebaseAdmin() {
+    if (!initialized && process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_STORAGE_BUCKET) {
         const privateKey = process.env.FIREBASE_PRIVATE_KEY!.replace(/\\n/g, '\n');
         try {
-            const app = admin.initializeApp({
-                credential: admin.credential.cert({
-                    projectId: process.env.FIREBASE_PROJECT_ID,
-                    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-                    privateKey: privateKey,
-                }),
-                storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
-            });
-            db = getFirestore(app);
-            storage = getStorage(app);
+            if (!admin.apps.length) {
+                admin.initializeApp({
+                    credential: admin.credential.cert({
+                        projectId: process.env.FIREBASE_PROJECT_ID,
+                        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+                        privateKey: privateKey,
+                    }),
+                    storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
+                });
+            }
             initialized = true;
         } catch (error: any) {
             console.error("Firebase Admin SDK initialization error:", error.message);
         }
-    } else {
-        const app = admin.app();
-        db = getFirestore(app);
-        storage = getStorage(app);
-        initialized = true;
     }
-} else {
-    console.warn("Firebase Admin credentials or Storage Bucket not set. Server actions requiring auth or storage will fail.");
+
+    if (initialized) {
+        if (!db || !storage) {
+            const app = admin.app();
+            db = getFirestore(app);
+            storage = getStorage(app);
+        }
+    } else {
+        console.warn("Firebase Admin credentials or Storage Bucket not set. Server actions requiring auth or storage will fail.");
+    }
 }
+
+// Call initialization once at the module level.
+initializeFirebaseAdmin();
+// --- End Firebase Admin Initialization ---
 
 // Helper to get current user's UID and verify token
 async function getVerifiedUserId(token: string | undefined): Promise<string | null> {
+  // Ensure Firebase is initialized for every verification
+  initializeFirebaseAdmin();
   if (!token) {
     return null;
   }
@@ -60,7 +69,6 @@ async function getVerifiedUserId(token: string | undefined): Promise<string | nu
     return null;
   }
 }
-// --- End Firebase Admin Initialization ---
 
 type ProcessAndSaveState = {
   message: string;
@@ -174,12 +182,14 @@ export async function processAndSaveReceiptAction(
 export async function getReceiptsAction(idToken: string | undefined): Promise<Receipt[]> {
     const userId = await getVerifiedUserId(idToken);
     if (!userId) {
-        return [];
+        // Instead of returning empty, which can be ambiguous, throw an error.
+        // The client can decide how to handle "not logged in".
+        throw new Error("You must be logged in to view receipts.");
     }
 
     if (!db) {
         console.error("Firestore is not initialized. Cannot fetch receipts.");
-        return [];
+        throw new Error("The server is not configured correctly. Please check Firebase credentials.");
     }
     try {
         const receiptsSnapshot = await db.collection('receipts')

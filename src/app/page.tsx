@@ -38,11 +38,16 @@ export default function Home() {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred.';
       setError(errorMessage);
+      toast({
+          variant: 'destructive',
+          title: 'Error Loading Receipts',
+          description: errorMessage,
+      });
       console.error(err);
     } finally {
       setIsLoading(false);
     }
-  }, [user]);
+  }, [user, toast]);
 
   useEffect(() => {
     // Fetch receipts only when user object is available (not loading)
@@ -135,7 +140,7 @@ export default function Home() {
               </CardContent>
             </Card>
             
-            {error && (
+            {error && !isLoading && (
               <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
                 <AlertTitle>Error Loading Receipts</AlertTitle>
