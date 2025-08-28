@@ -85,13 +85,21 @@ In the Firebase Console for your project, you must enable the following services
     *   Click **Get started**.
     *   Follow the prompts to enable Cloud Storage.
 
-## 4. (Recommended) Firestore Security Rules
+## 4. (Recommended) Deploy Firestore Security Rules
 
-As a critical next step for any production application, you should secure your database with Firestore Security Rules. The application currently relies on server-side checks, but rules provide a vital, non-bypassable layer of security.
+As a critical security step, you should deploy the provided security rules to your Firestore database. These rules ensure that users can only access their own data.
 
-You can deploy these rules using the Firebase CLI, or by copying the contents of the `firestore.rules` file in this project and pasting it into the **Firestore Database > Rules** tab in your Firebase console.
+### Easiest Method: Copy and Paste into Firebase Console
 
-The provided rules ensure that users can only read and write their own data.
+1.  Open the `firestore.rules` file that is included in this project.
+2.  Copy the entire contents of the file.
+3.  Go to the [Firebase Console](https://console.firebase.google.com/) and navigate to your project.
+4.  In the left-hand menu, click **Build > Firestore Database**.
+5.  At the top of the page, click the **Rules** tab.
+6.  Delete all the text in the editor and paste the rules you copied from the `firestore.rules` file.
+7.  Click the **Publish** button.
+
+Your database is now protected. The rules ensure that a user must be authenticated, and that the `userId` on the receipt document they are trying to access matches their own user ID.
 ```
 rules_version = '2';
 service cloud.firestore {
