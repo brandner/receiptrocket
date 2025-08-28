@@ -10,6 +10,7 @@ export type ReceiptData = {
 export type Receipt = {
   id: string;
   image: string; // public URL for the image in Firebase Storage
+  imagePath?: string | null; // direct path to image in Firebase Storage bucket
   date: string; // ISO string
   userId: string;
 } & ReceiptData;

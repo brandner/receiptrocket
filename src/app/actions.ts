@@ -111,8 +111,8 @@ export async function processAndSaveReceiptAction(
 
         // 2. Upload image to Firebase Storage
         const mimeType = photo.type || 'image/jpeg';
-        const fileName = `receipts/${randomUUID()}.jpg`;
-        const file = storage.bucket().file(fileName);
+        const imagePath = `receipts/${randomUUID()}.jpg`;
+        const file = storage.bucket().file(imagePath);
 
         await file.save(buffer, {
             metadata: {
@@ -126,10 +126,11 @@ export async function processAndSaveReceiptAction(
             expires: '01-01-2500' // Far future expiration date
         });
 
-        // 4. Save receipt data with image URL to Firestore
+        // 4. Save receipt data with image URL and path to Firestore
         const newReceipt: Omit<Receipt, 'id'> = {
             ...extractedData,
             image: publicUrl,
+            imagePath: imagePath, // Store the direct file path
             date: new Date().toISOString(),
             userId,
         };
@@ -212,6 +213,7 @@ export async function getReceiptsAction(idToken: string | undefined): Promise<Re
                 pst: data.pst || null,
                 date: data.date,
                 image: data.image,
+                imagePath: data.imagePath || null,
                 userId: data.userId,
             };
         });
@@ -258,22 +260,17 @@ export async function deleteReceiptAction(id: string, idToken: string | undefine
             return { success: false, message: 'You do not have permission to delete this receipt.' };
         }
 
-        // Delete image from Storage
-        if (receiptData.image) {
+        // Delete image from Storage using the robust imagePath
+        if (receiptData.imagePath) {
             try {
-                const url = new URL(receiptData.image);
-                const pathName = decodeURIComponent(url.pathname);
-                // The actual file path in the bucket is usually after the bucket name and '/o/'
-                // e.g. /v0/b/your-bucket.appspot.com/o/receipts%2F...
-                const prefix = `/v0/b/${storage.bucket().name}/o/`;
-                const filePath = pathName.startsWith(prefix) ? pathName.substring(prefix.length) : '';
-
-                if (filePath) {
-                    await storage.bucket().file(filePath).delete();
+                await storage.bucket().file(receiptData.imagePath).delete();
+            } catch (storageError: any) {
+                 // Log a warning, but don't block Firestore deletion if file doesn't exist
+                if (storageError.code === 404) {
+                     console.warn(`File not found in Storage, but proceeding with Firestore deletion: ${receiptData.imagePath}`);
+                } else {
+                    console.error("Error deleting file from Storage, but proceeding with Firestore deletion:", storageError);
                 }
-            } catch (storageError) {
-                console.error("Error deleting file from Storage, continuing to delete Firestore doc:", storageError);
-                // Don't block Firestore deletion if storage deletion fails
             }
         }
 
