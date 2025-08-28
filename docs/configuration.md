@@ -16,7 +16,7 @@ Create a `.env` file in the root of the project. This file holds your Firebase p
 # --- Server-Side Admin Credentials (for Server Actions) ---
 FIREBASE_PROJECT_ID="your-firebase-project-id"
 FIREBASE_CLIENT_EMAIL="firebase-adminsdk-xxxxx@your-project-id.iam.gserviceaccount.com"
-FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\\n...your-private-key...\\n-----END PRIVATE KEY-----\\n"
+FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...your-private-key...\\n-----END PRIVATE KEY-----\n"
 FIREBASE_STORAGE_BUCKET="your-project-id.appspot.com"
 
 # --- Client-Side App Credentials (for the browser) ---
@@ -89,8 +89,9 @@ In the Firebase Console for your project, you must enable the following services
 
 As a critical next step for any production application, you should secure your database with Firestore Security Rules. The application currently relies on server-side checks, but rules provide a vital, non-bypassable layer of security.
 
-You can add the following rules in **Firestore Database > Rules** tab in your Firebase console:
+You can deploy these rules using the Firebase CLI, or by copying the contents of the `firestore.rules` file in this project and pasting it into the **Firestore Database > Rules** tab in your Firebase console.
 
+The provided rules ensure that users can only read and write their own data.
 ```
 rules_version = '2';
 service cloud.firestore {
