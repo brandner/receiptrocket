@@ -26,6 +26,9 @@ NEXT_PUBLIC_FIREBASE_PROJECT_ID="your-firebase-project-id"
 NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET="your-project-id.appspot.com"
 NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID="your-messaging-sender-id"
 NEXT_PUBLIC_FIREBASE_APP_ID="your-web-app-id"
+
+# --- Genkit AI Credentials ---
+GEMINI_API_KEY="your-gemini-api-key"
 ```
 
 ### How to get Server-Side Admin Credentials:
@@ -52,6 +55,15 @@ NEXT_PUBLIC_FIREBASE_APP_ID="your-web-app-id"
     *   `storageBucket` -> `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`
     *   `messagingSenderId` -> `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`
     *   `appId` -> `NEXT_PUBLIC_FIREBASE_APP_ID`
+
+### How to get Genkit (Gemini) API Credentials:
+
+1.  Go to [Google AI Studio](https://aistudio.google.com/).
+2.  Sign in with your Google account.
+3.  Click the **Get API key** button.
+4.  Click **Create API key in new project**.
+5.  Copy the generated API key.
+6.  Paste the key into the `GEMINI_API_KEY` variable in your `.env` file.
 
 ## 3. Enable Firebase Services
 
